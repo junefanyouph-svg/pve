@@ -196,10 +196,12 @@
     jOriginY = 0;
   const JR = 48;
   const gameWrap = document.getElementById("game-wrap");
+  let letterCanvasTouchId = null; // track letter canvas touch so joystick ignores it
+
   gameWrap.addEventListener(
     "touchstart",
     (e) => {
-      if (e.target.tagName === "BUTTON") return; // let button touches through
+      if (e.target.tagName === "BUTTON") return;
       e.preventDefault();
       if (jActive) return;
       const t = e.changedTouches[0];
@@ -214,9 +216,10 @@
     "touchmove",
     (e) => {
       if (!jActive) return;
-      e.preventDefault();
       for (const t of e.changedTouches) {
         if (t.identifier !== jTouchId) continue;
+        if (t.identifier === letterCanvasTouchId) continue; // letter touch — ignore
+        e.preventDefault();
         const dx = t.clientX - jOriginX,
           dy = t.clientY - jOriginY;
         const d = Math.hypot(dx, dy),
@@ -229,13 +232,15 @@
     { passive: false },
   );
   function endJ(e) {
-    for (const t of e.changedTouches)
+    for (const t of e.changedTouches) {
+      if (t.identifier === letterCanvasTouchId) continue; // letter touch — ignore
       if (t.identifier === jTouchId) {
         jActive = false;
         jTouchId = null;
         jDx = 0;
         jDy = 0;
       }
+    }
   }
   window.addEventListener("touchend", endJ);
   window.addEventListener("touchcancel", endJ);
@@ -333,31 +338,22 @@
     updateStageIndicator();
   }
 
-  // ── Word UI ───────────────────────────────────────────────────────────────
-  function generateNewLetters() {
-    currentLetters = generateLetters().map((c) => ({ char: c, used: false }));
-    selectedIndices = [];
-    isDragging = false;
-    dragPos = null;
-    isSubmitting = false;
-
-    resizeLetterCanvas();
-    updateWordDisplay();
-  }
-
   // ── Letter connect canvas ─────────────────────────────────────────────────
   const letterCanvas = document.getElementById("letter-canvas");
   const lctx = letterCanvas.getContext("2d");
   let letterPositions = []; // {x, y} center of each letter circle
   let dragPos = null;
   let isDragging = false;
-  const LETTER_R = 28; // circle radius
+  let letterCanvasSize = 0; // cached — avoid getBoundingClientRect during game tick
+  const LETTER_R = 28;
+  const OUTER_R_RATIO = 0.38;
 
   function resizeLetterCanvas() {
     const wrap = document.getElementById("letter-connect-wrap");
     const rect = wrap.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     const size = Math.min(rect.width, rect.height);
+    letterCanvasSize = size;
     letterCanvas.width = size * dpr;
     letterCanvas.height = size * dpr;
     letterCanvas.style.width = size + "px";
@@ -367,7 +363,20 @@
     renderTiles();
   }
 
-  const OUTER_R_RATIO = 0.38; // outer circle stays this size
+  // ── Word UI ───────────────────────────────────────────────────────────────
+  function generateNewLetters() {
+    currentLetters = generateLetters().map((c) => ({ char: c, used: false }));
+    selectedIndices = [];
+    isDragging = false;
+    dragPos = null;
+    isSubmitting = false;
+    // Use cached size — no DOM read during game tick
+    if (letterCanvasSize > 0) {
+      computeLetterPositions(letterCanvasSize);
+    }
+    renderTiles();
+    updateWordDisplay();
+  }
 
   function computeLetterPositions(size) {
     const cx = size / 2, cy = size / 2;
@@ -571,7 +580,9 @@
   letterCanvas.addEventListener("touchstart", (e) => {
     if (stageClearPending || playerRunningOut) return;
     e.preventDefault();
+    e.stopPropagation(); // prevent joystick from seeing this touch
     const t = e.changedTouches[0];
+    letterCanvasTouchId = t.identifier;
     const i = letterIndexAt(t.clientX, t.clientY);
     if (i < 0) return;
     isDragging = true;
@@ -584,13 +595,13 @@
   letterCanvas.addEventListener("touchmove", (e) => {
     if (!isDragging) return;
     e.preventDefault();
+    e.stopPropagation();
     const t = e.changedTouches[0];
     dragPos = clientToCanvas(t.clientX, t.clientY);
     const i = letterIndexAt(t.clientX, t.clientY);
     if (i >= 0) {
       const idx = selectedIndices.indexOf(i);
       if (idx !== -1 && idx < selectedIndices.length - 1) {
-        // Drag back to a previous letter — trim to that point
         selectedIndices = selectedIndices.slice(0, idx + 1);
         updateWordDisplay();
       } else if (idx === -1 && !currentLetters[i].used) {
@@ -603,7 +614,19 @@
 
   letterCanvas.addEventListener("touchend", (e) => {
     e.preventDefault();
+    e.stopPropagation();
+    letterCanvasTouchId = null;
     releaseAndSubmit();
+  }, { passive: false });
+
+  letterCanvas.addEventListener("touchcancel", (e) => {
+    e.stopPropagation();
+    letterCanvasTouchId = null;
+    isDragging = false;
+    dragPos = null;
+    selectedIndices = [];
+    renderTiles();
+    updateWordDisplay();
   }, { passive: false });
 
   window.addEventListener("resize", resizeLetterCanvas);
@@ -757,7 +780,8 @@
       [currentLetters[i], currentLetters[j]] = [currentLetters[j], currentLetters[i]];
     }
     selectedIndices = [];
-    resizeLetterCanvas();
+    if (letterCanvasSize > 0) computeLetterPositions(letterCanvasSize);
+    renderTiles();
     updateWordDisplay();
   });
 
@@ -831,6 +855,7 @@
     let best = null,
       bestD = Infinity;
     for (const e of enemies) {
+      if (!e || e.x === undefined) continue;
       const d = Math.hypot(e.x - player.x, e.y - player.y);
       if (d < bestD) {
         bestD = d;
@@ -957,6 +982,7 @@
 
   // ── Update ────────────────────────────────────────────────────────────────
   function update(dt) {
+    if (!player) return; // safety — player not initialized yet
     const diff = getDiff();
 
     // Player run-off animation after stage clear button clicked
@@ -1051,6 +1077,7 @@
       }
       for (let j = enemies.length - 1; j >= 0; j--) {
         const e = enemies[j];
+        if (!e || e.x === undefined) continue;
         // Word-shots home toward their target enemy; regular shots hit any enemy
         if (b.isWordShot && b.targetId !== e.id) continue;
         if (Math.hypot(b.x - e.x, b.y - e.y) < b.r + e.r) {
@@ -1084,6 +1111,7 @@
     // Enemies
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
+      if (!e || e.x === undefined) continue;
       const a = Math.atan2(player.y - e.y, player.x - e.x);
       e.x += Math.cos(a) * e.speed * dt;
       e.y += Math.sin(a) * e.speed * dt;
