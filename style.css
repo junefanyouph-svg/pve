@@ -49,44 +49,52 @@ html, body {
   box-shadow: 0 0 40px rgba(0,0,0,0.6);
 }
 
-/* ── HUD bar ── */
+/* ── HUD overlay (inside game-wrap) ── */
 #hud {
+  position: absolute;
+  top: 0; left: 0; right: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 6px 14px 5px;
-  background: var(--brown);
-  border-bottom: 3px solid var(--wood);
-  flex-shrink: 0;
+  background: rgba(60, 25, 10, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border-bottom: 1.5px solid rgba(139,94,60,0.4);
   z-index: 20;
+  pointer-events: none;
 }
 .hb { display: flex; flex-direction: column; align-items: center; gap: 0; }
 .hl { font-size: 9px; color: #d4a96a; letter-spacing: 1px; text-transform: uppercase; font-family: 'Fredoka One', cursive; }
-.hv { font-family: 'Fredoka One', cursive; font-size: 18px; color: var(--cream); line-height: 1; }
+.hv { font-family: 'Fredoka One', cursive; font-size: 16px; color: var(--cream); line-height: 1; }
 
-/* ── Stage indicator ── */
+/* ── Stage indicator overlay (inside game-wrap) ── */
 #stage-indicator {
+  position: absolute;
+  top: 40px; left: 50%; transform: translateX(-50%);
   display: flex;
-  justify-content: center;
   align-items: center;
-  gap: 8px;
-  padding: 5px 0 4px;
-  background: var(--brown);
-  border-bottom: 2px solid var(--wood);
-  flex-shrink: 0;
+  gap: 6px;
+  padding: 3px 10px;
+  background: rgba(60,25,10,0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border-radius: 20px;
+  border: 1px solid rgba(139,94,60,0.4);
   z-index: 20;
+  pointer-events: none;
 }
 .stage-dot {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
   border: 2px solid #d4a96a;
   background: rgba(0,0,0,0.3);
   transition: background 0.25s, box-shadow 0.25s;
 }
 .stage-dot.active {
   background: var(--gold);
-  box-shadow: 0 0 8px rgba(232,160,32,0.8);
+  box-shadow: 0 0 6px rgba(232,160,32,0.8);
 }
 .stage-dot.done {
   background: var(--dkgrn);
@@ -94,11 +102,9 @@ html, body {
   box-shadow: none;
 }
 
-
 #game-wrap {
   position: relative;
-  flex: 0 0 50%;
-  border-bottom: 4px solid var(--wood);
+  flex: 0 0 35%;
   overflow: hidden;
   background: #000;
 }
@@ -190,33 +196,24 @@ html, body {
 /* Button row */
 #btn-row {
   display: flex;
-  gap: 6px;
+  justify-content: center;
+  gap: 8px;
   flex-shrink: 0;
 }
 .act-btn {
-  flex: 1;
-  padding: 8px 0;
+  padding: 7px 20px;
   font-family: 'Fredoka One', cursive;
   font-size: 13px;
   letter-spacing: 1px;
-  border: 2.5px solid var(--wood);
-  border-radius: 8px;
+  border-radius: 20px;
   cursor: pointer;
   touch-action: manipulation;
   transition: all 0.12s;
   box-shadow: 0 3px 0 rgba(0,0,0,0.3);
 }
 .act-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.3); }
-
-#submit-btn { background: var(--green); color: var(--cream); border-color: var(--dkgrn); }
-#submit-btn:active, #submit-btn:hover { background: #5a9e4a; }
-#submit-btn:disabled { opacity: 0.4; pointer-events: none; }
-
-#clear-btn  { background: #c0392b; color: var(--cream); border-color: #8b2020; }
-#clear-btn:active, #clear-btn:hover { background: #a93226; }
-
-#refresh-btn { background: var(--gold); color: var(--brown); border-color: #b8820a; }
-#refresh-btn:active, #refresh-btn:hover { background: #d4921c; }
+#shuffle-btn { background: var(--gold); color: var(--brown); border: 2.5px solid #b8820a; }
+#refresh-btn { background: var(--green); color: var(--cream); border: 2.5px solid var(--dkgrn); }
 
 /* ── Letter connect ── */
 #letter-connect-wrap {
@@ -230,6 +227,18 @@ html, body {
 #letter-canvas {
   display: block;
   touch-action: none;
+}
+#letter-canvas.shake {
+  animation: letterShake 0.4s ease-in-out;
+}
+@keyframes letterShake {
+  0%   { transform: translateX(0); }
+  15%  { transform: translateX(-8px); }
+  35%  { transform: translateX(8px); }
+  55%  { transform: translateX(-6px); }
+  75%  { transform: translateX(6px); }
+  90%  { transform: translateX(-3px); }
+  100% { transform: translateX(0); }
 }
 
 /* Feedback */
@@ -429,7 +438,7 @@ html, body {
 }
 /* Kill progress bar */
 #kill-progress-wrap {
-  position: absolute; top: 4px; left: 0; right: 0;
+  position: absolute; bottom: 0; left: 0; right: 0;
   height: 5px; background: rgba(0,0,0,0.3); z-index: 15;
 }
 #kill-progress-bar {

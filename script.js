@@ -173,7 +173,7 @@
   const wordText = document.getElementById("word-text");
   const wordDisplay = document.getElementById("word-display");
   const dmgPreview = document.getElementById("dmg-preview");
-  const submitBtn = document.getElementById("submit-btn");
+  const submitBtn = { disabled: false }; // removed — auto-submit on drag release
   const feedbackEl = document.getElementById("feedback");
   const comboBar = document.getElementById("combo-bar");
   const comboCount = document.getElementById("combo-count");
@@ -257,6 +257,7 @@
   let stageBtnVisible = false; // true only when the next-stage button is actually showing
   let playerRunningOut = false; // true while player auto-runs off screen after stage clear
   let stageToken = 0; // incremented each stage — stale callbacks check this and bail
+  let isSubmitting = false; // prevent double-submit on fast drag release
   let running = false,
     raf = null,
     lastTs = 0;
@@ -338,7 +339,8 @@
     selectedIndices = [];
     isDragging = false;
     dragPos = null;
-    submitBtn.disabled = false;
+    isSubmitting = false;
+
     resizeLetterCanvas();
     updateWordDisplay();
   }
@@ -365,9 +367,11 @@
     renderTiles();
   }
 
+  const OUTER_R_RATIO = 0.38; // outer circle stays this size
+
   function computeLetterPositions(size) {
     const cx = size / 2, cy = size / 2;
-    const r = size * 0.34;
+    const r = size * OUTER_R_RATIO; // letters sit ON the outer circle edge
     const count = currentLetters.length;
     letterPositions = currentLetters.map((_, i) => {
       const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
@@ -379,15 +383,15 @@
     const size = letterCanvas.width / (window.devicePixelRatio || 1);
     lctx.clearRect(0, 0, size, size);
 
-    // Draw big background circle
+    // Draw fixed outer circle
     const cx = size / 2, cy = size / 2;
-    const bgR = size * 0.42;
+    const bgR = size * OUTER_R_RATIO;
     lctx.beginPath();
     lctx.arc(cx, cy, bgR, 0, Math.PI * 2);
     lctx.fillStyle = "rgba(0,0,0,0.18)";
     lctx.fill();
-    lctx.strokeStyle = "rgba(255,255,255,0.08)";
-    lctx.lineWidth = 2;
+    lctx.strokeStyle = "rgba(255,255,255,0.12)";
+    lctx.lineWidth = 2.5;
     lctx.stroke();
 
     // Draw connector lines between selected letters
@@ -465,7 +469,7 @@
       lctx.textAlign = "center";
       lctx.textBaseline = "middle";
       lctx.fillStyle = isUsed ? "rgba(100,80,60,0.3)" : isSelected ? "#3a1a00" : "#6b3a2a";
-      lctx.fillText(lt.char, x, y - 2);
+      lctx.fillText(lt.char, x, y);
 
       // Score subscript
       lctx.font = "10px 'Patrick Hand', cursive";
@@ -535,19 +539,34 @@
     if (!isDragging) return;
     dragPos = clientToCanvas(e.clientX, e.clientY);
     const i = letterIndexAt(e.clientX, e.clientY);
-    if (i >= 0 && !selectedIndices.includes(i) && !currentLetters[i].used) {
-      selectedIndices.push(i);
-      updateWordDisplay();
+    if (i >= 0) {
+      const idx = selectedIndices.indexOf(i);
+      if (idx !== -1 && idx < selectedIndices.length - 1) {
+        // Drag back to a previous letter — trim to that point
+        selectedIndices = selectedIndices.slice(0, idx + 1);
+        updateWordDisplay();
+      } else if (idx === -1 && !currentLetters[i].used) {
+        selectedIndices.push(i);
+        updateWordDisplay();
+      }
     }
     renderTiles();
   });
 
-  window.addEventListener("mouseup", () => {
+  function releaseAndSubmit() {
     if (!isDragging) return;
     isDragging = false;
     dragPos = null;
-    renderTiles();
-  });
+    if (selectedIndices.length >= 3 && !stageClearPending && !playerRunningOut) {
+      submitWord();
+    } else {
+      selectedIndices = [];
+      renderTiles();
+      updateWordDisplay();
+    }
+  }
+
+  window.addEventListener("mouseup", releaseAndSubmit);
 
   letterCanvas.addEventListener("touchstart", (e) => {
     if (stageClearPending || playerRunningOut) return;
@@ -568,19 +587,23 @@
     const t = e.changedTouches[0];
     dragPos = clientToCanvas(t.clientX, t.clientY);
     const i = letterIndexAt(t.clientX, t.clientY);
-    if (i >= 0 && !selectedIndices.includes(i) && !currentLetters[i].used) {
-      selectedIndices.push(i);
-      updateWordDisplay();
+    if (i >= 0) {
+      const idx = selectedIndices.indexOf(i);
+      if (idx !== -1 && idx < selectedIndices.length - 1) {
+        // Drag back to a previous letter — trim to that point
+        selectedIndices = selectedIndices.slice(0, idx + 1);
+        updateWordDisplay();
+      } else if (idx === -1 && !currentLetters[i].used) {
+        selectedIndices.push(i);
+        updateWordDisplay();
+      }
     }
     renderTiles();
   }, { passive: false });
 
   letterCanvas.addEventListener("touchend", (e) => {
-    if (!isDragging) return;
     e.preventDefault();
-    isDragging = false;
-    dragPos = null;
-    renderTiles();
+    releaseAndSubmit();
   }, { passive: false });
 
   window.addEventListener("resize", resizeLetterCanvas);
@@ -593,10 +616,8 @@
     wordDisplay.className = "";
     if (word.length >= 3) {
       dmgPreview.textContent = "+" + calcDamage(word) + " 💥";
-      submitBtn.disabled = false;
     } else {
       dmgPreview.textContent = "";
-      submitBtn.disabled = true;
     }
   }
 
@@ -631,7 +652,7 @@
 
   function submitWord() {
     if (stageClearPending || playerRunningOut) return;
-    if (submitBtn.disabled) return; // block re-entry during cooldown
+    if (isSubmitting) return; // block re-entry during cooldown
     const word = selectedIndices
       .map((i) => currentLetters[i].char)
       .join("")
@@ -641,7 +662,7 @@
       showFeedback("⏳ Loading dictionary...", "miss");
       return;
     }
-    submitBtn.disabled = true; // lock immediately — re-enabled by generateNewLetters/renderTiles
+    isSubmitting = true; // lock until generateNewLetters resets it
 
     if (VALID_WORDS.has(word)) {
       const dmg = calcDamage(word);
@@ -702,6 +723,10 @@
     } else {
       wordDisplay.classList.add("invalid");
       breakCombo("invalid word");
+      isSubmitting = false;
+      // Shake the letter canvas to signal wrong word
+      letterCanvas.classList.add("shake");
+      setTimeout(() => letterCanvas.classList.remove("shake"), 400);
       selectedIndices = [];
       const token = stageToken;
       setTimeout(() => {
@@ -724,13 +749,18 @@
     setTimeout(() => pop.remove(), 1000);
   }
 
-  submitBtn.addEventListener("click", submitWord);
-  document.getElementById("clear-btn").addEventListener("click", () => {
+  const shuffleBtn = document.getElementById("shuffle-btn");
+  shuffleBtn.addEventListener("click", () => {
     if (stageClearPending || playerRunningOut) return;
+    for (let i = currentLetters.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [currentLetters[i], currentLetters[j]] = [currentLetters[j], currentLetters[i]];
+    }
     selectedIndices = [];
-    renderTiles();
+    resizeLetterCanvas();
     updateWordDisplay();
   });
+
   document.getElementById("refresh-btn").addEventListener("click", () => {
     if (stageClearPending || playerRunningOut) return;
     breakCombo("letters refreshed");
@@ -918,7 +948,7 @@
     bullets = []; // clear any in-flight word-shots from previous stage
     document.getElementById("word-panel").style.opacity = "";
     document.getElementById("word-panel").style.pointerEvents = "";
-    submitBtn.disabled = false;
+
     updateHUD();
     updateComboUI();
     showStageFlash("⚔️ Stage " + world + "-" + stage);
