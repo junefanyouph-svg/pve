@@ -619,9 +619,11 @@
     enemies = [];
     bullets = []; // clear field — also kills any in-flight word-shots
 
-    // Idle the player while waiting
+    // Idle the player while waiting — flush all inputs
     player.moving = false;
     player.attacking = false;
+    jDx = 0; jDy = 0; jActive = false; jTouchId = null;
+    Object.keys(keys).forEach(k => keys[k] = false);
 
     // Clear selection and gray out the word panel
     selectedIndices = [];
@@ -643,6 +645,8 @@
 
   function showStageIntro() {
     playerRunningOut = false;
+    jDx = 0; jDy = 0; jActive = false; jTouchId = null;
+    Object.keys(keys).forEach(k => keys[k] = false);
 
     // Advance world/stage counters
     if (stage >= STAGES_PER_WORLD) {
@@ -673,6 +677,8 @@
     player.y = H * 0.6;
     player.moving = false;
     player.attacking = false;
+    jDx = 0; jDy = 0; jActive = false; jTouchId = null;
+    Object.keys(keys).forEach(k => keys[k] = false);
 
     enemies = [];
     bullets = []; // clear any in-flight word-shots from previous stage
@@ -690,7 +696,10 @@
 
     // Player run-off animation after stage clear button clicked
     if (playerRunningOut) {
+      // Force flush inputs so nothing interferes
+      jDx = 0; jDy = 0;
       player.moving = true;
+      player.attacking = false;
       player.x += 260 * dt; // run rightward
       if (player.x > W + player.r * 2) {
         showStageIntro(); // player exited screen — show intro
