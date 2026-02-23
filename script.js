@@ -254,6 +254,7 @@
   let stageKills = 0; // kills in current stage
   let stageEnemiesSpawned = 0; // total spawned this stage (capped at killsNeeded)
   let stageClearPending = false;
+  let stageBtnVisible = false; // true only when the next-stage button is actually showing
   let playerRunningOut = false; // true while player auto-runs off screen after stage clear
   let stageToken = 0; // incremented each stage — stale callbacks check this and bail
   let running = false,
@@ -297,8 +298,9 @@
     stageKills = 0;
     stageEnemiesSpawned = 0;
     stageClearPending = false;
+    stageBtnVisible = false;
     playerRunningOut = false;
-    stageToken++; // cancel any stale callbacks
+    stageToken++;
     nextStageBtn.style.display = "none";
     stageIntroEl.style.display = "none";
     shootTimer = 0;
@@ -631,21 +633,25 @@
     enemies = [];
     bullets = []; // clear field — also kills any in-flight word-shots
 
-    // Idle the player while waiting — flush all inputs
-    player.moving = false;
-    player.attacking = false;
-    jDx = 0; jDy = 0; jActive = false; jTouchId = null;
-    Object.keys(keys).forEach(k => keys[k] = false);
-
-    // Clear selection and gray out the word panel
+    // Clear selection and gray out the word panel immediately
     selectedIndices = [];
     renderTiles();
     updateWordDisplay();
     document.getElementById("word-panel").style.opacity = "0.4";
     document.getElementById("word-panel").style.pointerEvents = "none";
 
-    // Show the next-stage button on the canvas
-    nextStageBtn.style.display = "block";
+    // Let player move freely for 1 second, then show the button
+    const token = stageToken;
+    setTimeout(() => {
+      if (stageToken !== token) return;
+      // Idle the player and flush inputs before showing button
+      player.moving = false;
+      player.attacking = false;
+      jDx = 0; jDy = 0; jActive = false; jTouchId = null;
+      Object.keys(keys).forEach(k => keys[k] = false);
+      nextStageBtn.style.display = "block";
+      stageBtnVisible = true;
+    }, 1000);
   }
 
   function onNextStageBtnClick() {
@@ -681,6 +687,7 @@
   function advanceStage() {
     stageIntroEl.style.display = "none";
     stageClearPending = false;
+    stageBtnVisible = false;
     stageKills = 0;
     stageEnemiesSpawned = 0;
     stageToken++; // cancel any stale callbacks from previous stage
@@ -720,7 +727,7 @@
       return; // skip all other update logic during run-off
     }
 
-    if (stageClearPending) return; // pause update during clear screen (waiting for button click)
+    if (stageClearPending && stageBtnVisible) return; // fully paused — button is showing, waiting for click
 
     // Player movement — left half
     let mx = jDx,
@@ -749,39 +756,42 @@
       Math.min(groundBottom, player.y + my * diff.playerSpeed * dt),
     );
 
-    // Auto-shoot knife toward nearest enemy
-    const ATTACK_RANGE = W * 0.8; // only attack enemies within 20% of canvas width
-    const target = nearestEnemy();
-    const targetInRange =
-      target &&
-      Math.hypot(target.x - player.x, target.y - player.y) <= ATTACK_RANGE;
-    player.attacking = !!targetInRange;
-    shootTimer -= dt;
-    if (shootTimer <= 0) {
-      if (targetInRange) {
-        const a = Math.atan2(target.y - player.y, target.x - player.x);
-        player.angle = a;
-        bullets.push({
-          x: player.x,
-          y: player.y,
-          vx: Math.cos(a) * 420,
-          vy: Math.sin(a) * 420,
-          angle: a,
-          r: 10,
-          life: 1.4,
-        });
+    // Auto-shoot and spawn only when stage is active
+    if (!stageClearPending) {
+      // Auto-shoot knife toward nearest enemy
+      const ATTACK_RANGE = W * 0.8;
+      const target = nearestEnemy();
+      const targetInRange =
+        target &&
+        Math.hypot(target.x - player.x, target.y - player.y) <= ATTACK_RANGE;
+      player.attacking = !!targetInRange;
+      shootTimer -= dt;
+      if (shootTimer <= 0) {
+        if (targetInRange) {
+          const a = Math.atan2(target.y - player.y, target.x - player.x);
+          player.angle = a;
+          bullets.push({
+            x: player.x,
+            y: player.y,
+            vx: Math.cos(a) * 420,
+            vy: Math.sin(a) * 420,
+            angle: a,
+            r: 10,
+            life: 1.4,
+          });
+        }
+        shootTimer = diff.shootInterval;
       }
-      shootTimer = diff.shootInterval;
-    }
 
-    // Spawn — only up to the fixed pool for this stage
-    spawnTimer -= dt;
-    const remaining = killsNeeded() - stageKills;
-    const canSpawn = stageEnemiesSpawned < killsNeeded() && enemies.length < remaining;
-    if (spawnTimer <= 0 && canSpawn && enemies.length < diff.maxEnemies) {
-      spawnEnemy(diff);
-      stageEnemiesSpawned++;
-      spawnTimer = diff.spawnInterval;
+      // Spawn — only up to the fixed pool for this stage
+      spawnTimer -= dt;
+      const remaining = killsNeeded() - stageKills;
+      const canSpawn = stageEnemiesSpawned < killsNeeded() && enemies.length < remaining;
+      if (spawnTimer <= 0 && canSpawn && enemies.length < diff.maxEnemies) {
+        spawnEnemy(diff);
+        stageEnemiesSpawned++;
+        spawnTimer = diff.spawnInterval;
+      }
     }
 
     // Bullets (knives)
