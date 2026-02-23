@@ -97,7 +97,7 @@ html, body {
   flex: 0 0 50%;
   border-bottom: 4px solid var(--wood);
   overflow: hidden;
-  background: var(--sky);
+  background: #000;
 }
 /* sprite-layer must not be clipped */
 #sprite-layer {

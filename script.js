@@ -960,19 +960,17 @@
   function draw() {
     _beginSprites(); // reset sprite overlay pool
 
-    // ── Background: 5 layers drawn back to front, zoomed out 500% ──
-    // ── Background — seasonal, loops every 4 stages ──
+    // ── Background — seasonal, loops every world ──
     const seasons = [ASSETS.bgSpring, ASSETS.bgSummer, ASSETS.bgAutumn, ASSETS.bgWinter];
     const bgImg = seasons[(world - 1) % 4];
-    function drawBgLayerBottom(img, scale = 0.2) {
-      if (!img || !img.complete || !img.naturalWidth) return;
-      const dw = img.naturalWidth * scale;
-      const dh = img.naturalHeight * scale;
+    if (bgImg && bgImg.complete && bgImg.naturalWidth) {
+      // Scale to cover full canvas height, center horizontally
+      const scale = H / bgImg.naturalHeight;
+      const dw = bgImg.naturalWidth * scale;
+      const dh = H;
       const x = (W - dw) / 2;
-      const y = H - dh;
-      ctx.drawImage(img, x, y, dw, dh);
+      ctx.drawImage(bgImg, x, 0, dw, dh);
     }
-    drawBgLayerBottom(bgImg, 0.15);
 
     // Joystick visual
     if (jActive) {
