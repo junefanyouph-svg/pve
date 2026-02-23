@@ -1,0 +1,493 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Patrick+Hand&display=swap');
+
+:root {
+  --cream:  #fdf6e3;
+  --brown:  #6b3a2a;
+  --green:  #4a7c3f;
+  --dkgrn:  #2d5a27;
+  --gold:   #e8a020;
+  --red:    #c0392b;
+  --sky:    #87ceeb;
+  --grass:  #5a9e4a;
+  --dirt:   #a0714f;
+  --wood:   #8b5e3c;
+  --panel:  #2d5a27;
+  --tile-bg:#fdf6e3;
+  --tile-br:#8b5e3c;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+
+html, body {
+  width: 100%; height: 100%;
+  background: #1a3a1a;
+  background-image:
+    radial-gradient(circle at 20% 50%, #2d5a1b 0%, transparent 50%),
+    radial-gradient(circle at 80% 50%, #1a3a0a 0%, transparent 50%),
+    repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(255,255,255,0.02) 19px, rgba(255,255,255,0.02) 20px),
+    repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(255,255,255,0.02) 19px, rgba(255,255,255,0.02) 20px);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  font-family: 'Patrick Hand', cursive;
+  color: var(--brown);
+}
+
+/* ── Phone container ── */
+#app {
+  width: 390px;
+  height: min(844px, 98vh);
+  display: flex;
+  flex-direction: column;
+  border-left: 3px solid var(--wood);
+  border-right: 3px solid var(--wood);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 0 40px rgba(0,0,0,0.6);
+}
+
+/* ── HUD bar ── */
+#hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 14px 5px;
+  background: var(--brown);
+  border-bottom: 3px solid var(--wood);
+  flex-shrink: 0;
+  z-index: 20;
+}
+.hb { display: flex; flex-direction: column; align-items: center; gap: 0; }
+.hl { font-size: 9px; color: #d4a96a; letter-spacing: 1px; text-transform: uppercase; font-family: 'Fredoka One', cursive; }
+.hv { font-family: 'Fredoka One', cursive; font-size: 18px; color: var(--cream); line-height: 1; }
+
+/* ── Stage indicator ── */
+#stage-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0 4px;
+  background: var(--brown);
+  border-bottom: 2px solid var(--wood);
+  flex-shrink: 0;
+  z-index: 20;
+}
+.stage-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 2px solid #d4a96a;
+  background: rgba(0,0,0,0.3);
+  transition: background 0.25s, box-shadow 0.25s;
+}
+.stage-dot.active {
+  background: var(--gold);
+  box-shadow: 0 0 8px rgba(232,160,32,0.8);
+}
+.stage-dot.done {
+  background: var(--dkgrn);
+  border-color: var(--green);
+  box-shadow: none;
+}
+
+
+#game-wrap {
+  position: relative;
+  flex: 0 0 50%;
+  border-bottom: 4px solid var(--wood);
+  overflow: hidden;
+  background: var(--sky);
+}
+/* sprite-layer must not be clipped */
+#sprite-layer {
+  overflow: visible !important;
+}
+#game-canvas { display: block; width: 100%; height: 100%; }
+
+/* center divider hint in canvas done via draw */
+
+/* ── Word Panel (bottom half) ── */
+#word-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  padding: 10px 12px 8px;
+  gap: 8px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Wooden sign header */
+#panel-header {
+  text-align: center;
+  font-family: 'Fredoka One', cursive;
+  font-size: 13px;
+  color: #d4a96a;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+/* Word display */
+#word-display-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+#word-display {
+  flex: 1;
+  background: var(--cream);
+  border: 3px solid var(--wood);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-family: 'Fredoka One', cursive;
+  font-size: 20px;
+  letter-spacing: 4px;
+  color: var(--brown);
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  position: relative;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.15);
+}
+#word-display.invalid { border-color: var(--red); color: var(--red); animation: shake 0.3s; }
+#word-display.valid   { border-color: var(--gold); color: var(--dkgrn); }
+
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+#word-cursor {
+  display: inline-block;
+  width: 2px; height: 20px;
+  background: var(--brown);
+  margin-left: 2px;
+  animation: blink 1s infinite;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+#dmg-preview {
+  font-family: 'Fredoka One', cursive;
+  font-size: 13px;
+  color: var(--gold);
+  white-space: nowrap;
+  min-width: 52px;
+  text-align: right;
+  flex-shrink: 0;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+/* Button row */
+#btn-row {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.act-btn {
+  flex: 1;
+  padding: 8px 0;
+  font-family: 'Fredoka One', cursive;
+  font-size: 13px;
+  letter-spacing: 1px;
+  border: 2.5px solid var(--wood);
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: all 0.12s;
+  box-shadow: 0 3px 0 rgba(0,0,0,0.3);
+}
+.act-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.3); }
+
+#submit-btn { background: var(--green); color: var(--cream); border-color: var(--dkgrn); }
+#submit-btn:active, #submit-btn:hover { background: #5a9e4a; }
+#submit-btn:disabled { opacity: 0.4; pointer-events: none; }
+
+#clear-btn  { background: #c0392b; color: var(--cream); border-color: #8b2020; }
+#clear-btn:active, #clear-btn:hover { background: #a93226; }
+
+#refresh-btn { background: var(--gold); color: var(--brown); border-color: #b8820a; }
+#refresh-btn:active, #refresh-btn:hover { background: #d4921c; }
+
+/* ── Letter tiles row ── */
+#letters-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 2px 0;
+}
+.tile {
+  width: 52px;
+  height: 58px;
+  border: 3px solid var(--tile-br);
+  border-radius: 10px;
+  background: var(--tile-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Fredoka One', cursive;
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--brown);
+  cursor: pointer;
+  transition: all 0.1s;
+  touch-action: manipulation;
+  position: relative;
+  flex-shrink: 0;
+  box-shadow: 0 3px 0 rgba(0,0,0,0.25);
+  user-select: none;
+}
+.tile:active, .tile.selected {
+  background: var(--gold);
+  border-color: var(--brown);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.25);
+  transform: translateY(2px);
+  color: var(--brown);
+}
+.tile.used {
+  opacity: 0.25;
+  pointer-events: none;
+  transform: translateY(2px);
+  box-shadow: none;
+}
+.tile-score {
+  font-size: 9px;
+  font-family: 'Patrick Hand', cursive;
+  color: #b08050;
+  line-height: 1;
+  margin-top: 1px;
+}
+.tile.selected .tile-score { color: #6b3a2a; }
+
+/* Feedback */
+#feedback {
+  text-align: center;
+  font-family: 'Fredoka One', cursive;
+  font-size: 13px;
+  color: #a0c080;
+  min-height: 18px;
+  flex-shrink: 0;
+  letter-spacing: 1px;
+}
+#feedback.hit  { color: var(--gold); }
+#feedback.miss { color: #e07060; }
+
+/* ── Overlay ── */
+#overlay {
+  position: absolute; inset: 0;
+  background: rgba(45, 25, 10, 0.93);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 14px; z-index: 60;
+  padding: 30px;
+}
+#overlay h1 {
+  font-family: 'Fredoka One', cursive;
+  font-size: 38px;
+  color: var(--gold);
+  text-shadow: 0 3px 0 rgba(0,0,0,0.4);
+  text-align: center;
+  line-height: 1.1;
+}
+#overlay .sub {
+  font-size: 13px; color: #c8a87a;
+  text-align: center; line-height: 2;
+}
+#overlay .stat { color: var(--cream); font-family: 'Fredoka One', cursive; font-size: 16px; line-height: 2.2; text-align: center; }
+.tap-btn {
+  padding: 12px 36px;
+  font-family: 'Fredoka One', cursive; font-size: 18px;
+  background: var(--green); color: var(--cream);
+  border: 3px solid var(--dkgrn); border-radius: 10px;
+  cursor: pointer; touch-action: manipulation;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.3);
+  transition: all 0.12s;
+}
+.tap-btn:active, .tap-btn:hover { background: #5a9e4a; transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.3); }
+
+/* Wave flash */
+#wave-flash {
+  position: absolute; top: 40%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Fredoka One', cursive;
+  font-size: 22px;
+  color: var(--gold); text-shadow: 0 2px 0 rgba(0,0,0,0.5);
+  pointer-events: none; opacity: 0;
+  letter-spacing: 2px; white-space: nowrap;
+  transition: opacity 0.5s; z-index: 40;
+}
+
+/* Damage popup */
+.dmg-pop {
+  position: absolute;
+  font-family: 'Fredoka One', cursive;
+  font-size: 18px;
+  color: var(--gold); text-shadow: 0 2px 0 rgba(0,0,0,0.4);
+  pointer-events: none; z-index: 50;
+  animation: popUp 1s forwards;
+}
+@keyframes popUp {
+  0%   { opacity: 1; transform: translateY(0) scale(1.1); }
+  100% { opacity: 0; transform: translateY(-44px) scale(0.7); }
+}
+
+/* ── Combo Meter ── */
+#combo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 0 2px;
+}
+#combo-label {
+  font-family: 'Fredoka One', cursive;
+  font-size: 12px;
+  color: #a0c080;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+#combo-bar-bg {
+  flex: 1;
+  height: 10px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 5px;
+  border: 1.5px solid rgba(255,255,255,0.1);
+  overflow: hidden;
+}
+#combo-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #e8a020, #ffdd44);
+  border-radius: 5px;
+  transition: width 0.15s, background 0.3s;
+}
+#combo-bar.hot { background: linear-gradient(90deg, #ff6600, #ffcc00); }
+#combo-count {
+  font-family: 'Fredoka One', cursive;
+  font-size: 15px;
+  color: var(--gold);
+  min-width: 32px;
+  text-align: right;
+  flex-shrink: 0;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+#combo-count.popping {
+  animation: comboPop 0.3s ease-out;
+}
+@keyframes comboPop {
+  0%   { transform: scale(1.6); color: #ff8800; }
+  100% { transform: scale(1);   color: var(--gold); }
+}
+
+/* ── Next Stage Button ── */
+#next-stage-btn {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  z-index: 30;
+  padding: 10px 18px;
+  font-family: 'Fredoka One', cursive;
+  font-size: 15px;
+  background: var(--gold);
+  color: var(--brown);
+  border: 2.5px solid #b8820a;
+  border-radius: 10px;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.35);
+  transition: all 0.12s;
+  animation: pulseBtn 1s infinite alternate;
+}
+#next-stage-btn:active, #next-stage-btn:hover {
+  background: #d4921c;
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 rgba(0,0,0,0.35);
+}
+@keyframes pulseBtn {
+  from { box-shadow: 0 4px 0 rgba(0,0,0,0.35), 0 0 0 0 rgba(232,160,32,0.5); }
+  to   { box-shadow: 0 4px 0 rgba(0,0,0,0.35), 0 0 0 8px rgba(232,160,32,0); }
+}
+
+/* ── Stage Intro Overlay ── */
+#stage-intro {
+  position: absolute; inset: 0;
+  background: rgba(20,10,5,0.88);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 55;
+}
+#stage-intro-inner {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 14px;
+  padding: 30px 24px;
+  background: rgba(45,90,39,0.95);
+  border: 3px solid var(--gold);
+  border-radius: 16px;
+  box-shadow: 0 0 40px rgba(232,160,32,0.3);
+}
+#stage-intro-title {
+  font-family: 'Fredoka One', cursive;
+  font-size: 28px; color: var(--gold);
+  text-shadow: 0 2px 0 rgba(0,0,0,0.4);
+  text-align: center; letter-spacing: 2px;
+}
+#stage-intro-sub {
+  font-family: 'Patrick Hand', cursive;
+  font-size: 14px; color: var(--cream);
+  text-align: center; line-height: 1.8;
+}
+/* Stage flash text */
+#stage-flash {
+  position: absolute; top: 30%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Fredoka One', cursive; font-size: 20px;
+  color: var(--gold); text-shadow: 0 2px 0 rgba(0,0,0,0.5);
+  pointer-events: none; opacity: 0;
+  letter-spacing: 2px; white-space: nowrap;
+  transition: opacity 0.5s; z-index: 40;
+}
+/* Kill progress bar */
+#kill-progress-wrap {
+  position: absolute; top: 4px; left: 0; right: 0;
+  height: 5px; background: rgba(0,0,0,0.3); z-index: 15;
+}
+#kill-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #e8a020, #ffdd44);
+  transition: width 0.3s;
+  width: 0%;
+}
+
+/* GIF animation cache — images must be live DOM elements to animate on canvas */
+#gif-cache {
+  position: absolute;
+  width: 0; height: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+}
+#gif-cache img { position: absolute; }
+
+/* ── GIF sprite overlays (positioned over canvas so browser animates GIFs natively) ── */
+#sprite-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 10;
+}
+#sprite-layer img {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  image-rendering: pixelated;
+  pointer-events: none;
+}
