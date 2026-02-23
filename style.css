@@ -218,58 +218,19 @@ html, body {
 #refresh-btn { background: var(--gold); color: var(--brown); border-color: #b8820a; }
 #refresh-btn:active, #refresh-btn:hover { background: #d4921c; }
 
-/* ── Letter tiles row ── */
-#letters-wrap {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  padding: 2px 0;
-}
-.tile {
-  width: 52px;
-  height: 58px;
-  border: 3px solid var(--tile-br);
-  border-radius: 10px;
-  background: var(--tile-bg);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Fredoka One', cursive;
-  font-size: 24px;
-  font-weight: 400;
-  color: var(--brown);
-  cursor: pointer;
-  transition: all 0.1s;
-  touch-action: manipulation;
+/* ── Letter connect ── */
+#letter-connect-wrap {
   position: relative;
-  flex-shrink: 0;
-  box-shadow: 0 3px 0 rgba(0,0,0,0.25);
-  user-select: none;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.tile:active, .tile.selected {
-  background: var(--gold);
-  border-color: var(--brown);
-  box-shadow: 0 1px 0 rgba(0,0,0,0.25);
-  transform: translateY(2px);
-  color: var(--brown);
+#letter-canvas {
+  display: block;
+  touch-action: none;
 }
-.tile.used {
-  opacity: 0.25;
-  pointer-events: none;
-  transform: translateY(2px);
-  box-shadow: none;
-}
-.tile-score {
-  font-size: 9px;
-  font-family: 'Patrick Hand', cursive;
-  color: #b08050;
-  line-height: 1;
-  margin-top: 1px;
-}
-.tile.selected .tile-score { color: #6b3a2a; }
 
 /* Feedback */
 #feedback {

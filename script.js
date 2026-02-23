@@ -169,7 +169,7 @@
   const elKills = document.getElementById("ui-kills");
   const overlay = document.getElementById("overlay");
   // stage-flash ref set above
-  const lettersWrap = document.getElementById("letters-wrap");
+  // lettersWrap removed — using letter-canvas instead
   const wordText = document.getElementById("word-text");
   const wordDisplay = document.getElementById("word-display");
   const dmgPreview = document.getElementById("dmg-preview");
@@ -336,44 +336,256 @@
   function generateNewLetters() {
     currentLetters = generateLetters().map((c) => ({ char: c, used: false }));
     selectedIndices = [];
-    renderTiles();
+    isDragging = false;
+    dragPos = null;
+    submitBtn.disabled = false;
+    resizeLetterCanvas();
     updateWordDisplay();
   }
 
-  function renderTiles() {
-    lettersWrap.innerHTML = "";
-    currentLetters.forEach((lt, i) => {
-      const tile = document.createElement("div");
-      tile.className =
-        "tile" +
-        (lt.used ? " used" : "") +
-        (selectedIndices.includes(i) ? " selected" : "");
-      tile.innerHTML = `<span>${lt.char}</span><span class="tile-score">${LETTER_SCORE[lt.char] || 1}</span>`;
-      tile.addEventListener("click", () => onTile(i));
-      tile.addEventListener(
-        "touchstart",
-        (e) => {
-          e.preventDefault();
-          onTile(i);
-        },
-        { passive: false },
-      );
-      lettersWrap.appendChild(tile);
+  // ── Letter connect canvas ─────────────────────────────────────────────────
+  const letterCanvas = document.getElementById("letter-canvas");
+  const lctx = letterCanvas.getContext("2d");
+  let letterPositions = []; // {x, y} center of each letter circle
+  let dragPos = null;
+  let isDragging = false;
+  const LETTER_R = 28; // circle radius
+
+  function resizeLetterCanvas() {
+    const wrap = document.getElementById("letter-connect-wrap");
+    const rect = wrap.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const size = Math.min(rect.width, rect.height);
+    letterCanvas.width = size * dpr;
+    letterCanvas.height = size * dpr;
+    letterCanvas.style.width = size + "px";
+    letterCanvas.style.height = size + "px";
+    lctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    computeLetterPositions(size);
+    renderTiles();
+  }
+
+  function computeLetterPositions(size) {
+    const cx = size / 2, cy = size / 2;
+    const r = size * 0.34;
+    const count = currentLetters.length;
+    letterPositions = currentLetters.map((_, i) => {
+      const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
+      return { x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r };
     });
+  }
+
+  function renderTiles() {
+    const size = letterCanvas.width / (window.devicePixelRatio || 1);
+    lctx.clearRect(0, 0, size, size);
+
+    // Draw big background circle
+    const cx = size / 2, cy = size / 2;
+    const bgR = size * 0.42;
+    lctx.beginPath();
+    lctx.arc(cx, cy, bgR, 0, Math.PI * 2);
+    lctx.fillStyle = "rgba(0,0,0,0.18)";
+    lctx.fill();
+    lctx.strokeStyle = "rgba(255,255,255,0.08)";
+    lctx.lineWidth = 2;
+    lctx.stroke();
+
+    // Draw connector lines between selected letters
+    if (selectedIndices.length > 1) {
+      lctx.beginPath();
+      lctx.strokeStyle = "#e8a020";
+      lctx.lineWidth = 4;
+      lctx.lineCap = "round";
+      lctx.lineJoin = "round";
+      const p0 = letterPositions[selectedIndices[0]];
+      lctx.moveTo(p0.x, p0.y);
+      for (let k = 1; k < selectedIndices.length; k++) {
+        const p = letterPositions[selectedIndices[k]];
+        lctx.lineTo(p.x, p.y);
+      }
+      lctx.stroke();
+    }
+
+    // Draw drag line from last selected to finger
+    if (selectedIndices.length > 0 && dragPos) {
+      const last = letterPositions[selectedIndices[selectedIndices.length - 1]];
+      lctx.beginPath();
+      lctx.setLineDash([6, 5]);
+      lctx.strokeStyle = "rgba(255,220,60,0.7)";
+      lctx.lineWidth = 3;
+      lctx.moveTo(last.x, last.y);
+      lctx.lineTo(dragPos.x, dragPos.y);
+      lctx.stroke();
+      lctx.setLineDash([]);
+    }
+
+    // Draw each letter circle
+    currentLetters.forEach((lt, i) => {
+      const { x, y } = letterPositions[i];
+      const isSelected = selectedIndices.includes(i);
+      const isUsed = lt.used;
+      const selOrder = selectedIndices.indexOf(i);
+
+      // Circle shadow
+      lctx.beginPath();
+      lctx.arc(x, y + 3, LETTER_R, 0, Math.PI * 2);
+      lctx.fillStyle = "rgba(0,0,0,0.25)";
+      lctx.fill();
+
+      // Circle fill
+      lctx.beginPath();
+      lctx.arc(x, y, LETTER_R, 0, Math.PI * 2);
+      if (isUsed) {
+        lctx.fillStyle = "rgba(200,200,200,0.25)";
+      } else if (isSelected) {
+        lctx.fillStyle = "#e8a020";
+      } else {
+        lctx.fillStyle = "#fdf6e3";
+      }
+      lctx.fill();
+
+      // Circle border
+      lctx.beginPath();
+      lctx.arc(x, y, LETTER_R, 0, Math.PI * 2);
+      lctx.strokeStyle = isSelected ? "#6b3a2a" : "#8b5e3c";
+      lctx.lineWidth = isSelected ? 3 : 2.5;
+      lctx.stroke();
+
+      // Glow for selected
+      if (isSelected) {
+        lctx.beginPath();
+        lctx.arc(x, y, LETTER_R + 4, 0, Math.PI * 2);
+        lctx.strokeStyle = "rgba(232,160,32,0.5)";
+        lctx.lineWidth = 3;
+        lctx.stroke();
+      }
+
+      // Letter
+      lctx.font = "bold 22px 'Fredoka One', cursive";
+      lctx.textAlign = "center";
+      lctx.textBaseline = "middle";
+      lctx.fillStyle = isUsed ? "rgba(100,80,60,0.3)" : isSelected ? "#3a1a00" : "#6b3a2a";
+      lctx.fillText(lt.char, x, y - 2);
+
+      // Score subscript
+      lctx.font = "10px 'Patrick Hand', cursive";
+      lctx.fillStyle = isSelected ? "#6b3a2a" : "#b08050";
+      lctx.fillText(LETTER_SCORE[lt.char] || 1, x + LETTER_R * 0.55, y + LETTER_R * 0.55);
+
+      // Order badge if selected
+      if (isSelected && selOrder >= 0) {
+        lctx.beginPath();
+        lctx.arc(x - LETTER_R * 0.6, y - LETTER_R * 0.6, 9, 0, Math.PI * 2);
+        lctx.fillStyle = "#4a7c3f";
+        lctx.fill();
+        lctx.font = "bold 10px 'Fredoka One', cursive";
+        lctx.fillStyle = "#fff";
+        lctx.textAlign = "center";
+        lctx.textBaseline = "middle";
+        lctx.fillText(selOrder + 1, x - LETTER_R * 0.6, y - LETTER_R * 0.6);
+      }
+    });
+  }
+
+  function letterIndexAt(clientX, clientY) {
+    const rect = letterCanvas.getBoundingClientRect();
+    const scaleX = letterCanvas.width / (window.devicePixelRatio || 1) / rect.width;
+    const scaleY = letterCanvas.height / (window.devicePixelRatio || 1) / rect.height;
+    const lx = (clientX - rect.left) * scaleX;
+    const ly = (clientY - rect.top) * scaleY;
+    for (let i = 0; i < letterPositions.length; i++) {
+      const { x, y } = letterPositions[i];
+      if (Math.hypot(lx - x, ly - y) <= LETTER_R + 6) return i;
+    }
+    return -1;
+  }
+
+  function clientToCanvas(clientX, clientY) {
+    const rect = letterCanvas.getBoundingClientRect();
+    const scaleX = letterCanvas.width / (window.devicePixelRatio || 1) / rect.width;
+    const scaleY = letterCanvas.height / (window.devicePixelRatio || 1) / rect.height;
+    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
   }
 
   function onTile(i) {
     if (stageClearPending || playerRunningOut) return;
-    if (currentLetters[i].used) return;
+    if (i < 0 || currentLetters[i].used) return;
     const idx = selectedIndices.indexOf(i);
     if (idx !== -1) {
-      if (idx === selectedIndices.length - 1) selectedIndices.pop();
+      selectedIndices = selectedIndices.slice(0, idx);
     } else {
       selectedIndices.push(i);
     }
     renderTiles();
     updateWordDisplay();
   }
+
+  letterCanvas.addEventListener("mousedown", (e) => {
+    if (stageClearPending || playerRunningOut) return;
+    const i = letterIndexAt(e.clientX, e.clientY);
+    if (i < 0) return;
+    isDragging = true;
+    selectedIndices = [];
+    selectedIndices.push(i);
+    renderTiles();
+    updateWordDisplay();
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if (!isDragging) return;
+    dragPos = clientToCanvas(e.clientX, e.clientY);
+    const i = letterIndexAt(e.clientX, e.clientY);
+    if (i >= 0 && !selectedIndices.includes(i) && !currentLetters[i].used) {
+      selectedIndices.push(i);
+      updateWordDisplay();
+    }
+    renderTiles();
+  });
+
+  window.addEventListener("mouseup", () => {
+    if (!isDragging) return;
+    isDragging = false;
+    dragPos = null;
+    renderTiles();
+  });
+
+  letterCanvas.addEventListener("touchstart", (e) => {
+    if (stageClearPending || playerRunningOut) return;
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    const i = letterIndexAt(t.clientX, t.clientY);
+    if (i < 0) return;
+    isDragging = true;
+    selectedIndices = [];
+    selectedIndices.push(i);
+    renderTiles();
+    updateWordDisplay();
+  }, { passive: false });
+
+  letterCanvas.addEventListener("touchmove", (e) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    dragPos = clientToCanvas(t.clientX, t.clientY);
+    const i = letterIndexAt(t.clientX, t.clientY);
+    if (i >= 0 && !selectedIndices.includes(i) && !currentLetters[i].used) {
+      selectedIndices.push(i);
+      updateWordDisplay();
+    }
+    renderTiles();
+  }, { passive: false });
+
+  letterCanvas.addEventListener("touchend", (e) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    isDragging = false;
+    dragPos = null;
+    renderTiles();
+  }, { passive: false });
+
+  window.addEventListener("resize", resizeLetterCanvas);
+  // Initial size after layout settles
+  setTimeout(resizeLetterCanvas, 50);
 
   function updateWordDisplay() {
     const word = selectedIndices.map((i) => currentLetters[i].char).join("");
@@ -635,6 +847,8 @@
 
     // Clear selection and gray out the word panel immediately
     selectedIndices = [];
+    isDragging = false;
+    dragPos = null;
     renderTiles();
     updateWordDisplay();
     document.getElementById("word-panel").style.opacity = "0.4";
@@ -704,6 +918,7 @@
     bullets = []; // clear any in-flight word-shots from previous stage
     document.getElementById("word-panel").style.opacity = "";
     document.getElementById("word-panel").style.pointerEvents = "";
+    submitBtn.disabled = false;
     updateHUD();
     updateComboUI();
     showStageFlash("⚔️ Stage " + world + "-" + stage);
