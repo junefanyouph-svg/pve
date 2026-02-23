@@ -255,6 +255,7 @@
   let stageEnemiesSpawned = 0; // total spawned this stage (capped at killsNeeded)
   let stageClearPending = false;
   let playerRunningOut = false; // true while player auto-runs off screen after stage clear
+  let stageToken = 0; // incremented each stage — stale callbacks check this and bail
   let running = false,
     raf = null,
     lastTs = 0;
@@ -297,6 +298,7 @@
     stageEnemiesSpawned = 0;
     stageClearPending = false;
     playerRunningOut = false;
+    stageToken++; // cancel any stale callbacks
     nextStageBtn.style.display = "none";
     stageIntroEl.style.display = "none";
     shootTimer = 0;
@@ -439,15 +441,18 @@
 
       // Fire a word-powered projectile at every enemy on screen
       if (enemies.length > 0) {
+        const token = stageToken;
         enemies.forEach((e, idx) => {
           const a = Math.atan2(e.y - player.y, e.x - player.x);
-          // Stagger each projectile slightly so they fan out visually
-          const delay = idx * 60; // ms between each launch
+          const delay = idx * 60;
           const wordDmg = Math.round(dmg * comboMult);
           setTimeout(() => {
-            if (!running) return;
+            if (!running || stageToken !== token) return; // stale — bail
             player.attacking = true;
-            setTimeout(() => { player.attacking = false; }, 300);
+            setTimeout(() => {
+              if (stageToken !== token) return;
+              player.attacking = false;
+            }, 300);
             bullets.push({
               x: player.x,
               y: player.y,
@@ -456,9 +461,9 @@
               angle: a,
               r: 12,
               life: 2.0,
-              wordDmg,          // carry the word damage payload
-              targetId: e.id,   // aimed at this specific enemy
-              isWordShot: true, // flag so collision uses wordDmg
+              wordDmg,
+              targetId: e.id,
+              isWordShot: true,
             });
           }, delay);
         });
@@ -475,12 +480,18 @@
         showFeedback("⚡ " + word.toUpperCase() + "! +" + totalDmg + multStr, "hit");
       }
 
-      setTimeout(generateNewLetters, 380);
+      const token = stageToken;
+      setTimeout(() => {
+        if (stageToken !== token) return; // stage changed — don't regenerate
+        generateNewLetters();
+      }, 380);
     } else {
       wordDisplay.classList.add("invalid");
       breakCombo("invalid word");
       selectedIndices = [];
+      const token = stageToken;
       setTimeout(() => {
+        if (stageToken !== token) return;
         renderTiles();
         updateWordDisplay();
       }, 300);
@@ -616,6 +627,7 @@
     if (stageEnemiesSpawned < killsNeeded()) return;
     if (stageKills < killsNeeded()) return;
     stageClearPending = true;
+    stageToken++; // invalidate all pending setTimeout callbacks from this stage
     enemies = [];
     bullets = []; // clear field — also kills any in-flight word-shots
 
@@ -671,6 +683,7 @@
     stageClearPending = false;
     stageKills = 0;
     stageEnemiesSpawned = 0;
+    stageToken++; // cancel any stale callbacks from previous stage
 
     // Reset player to left side
     player.x = W * 0.2;
