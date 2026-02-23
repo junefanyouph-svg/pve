@@ -30,12 +30,15 @@ html, body {
   overflow: hidden;
   font-family: 'Patrick Hand', cursive;
   color: var(--brown);
+  /* Fill true visible area including safe zones */
+  min-height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 /* ── Phone container ── */
 #app {
   width: 390px;
-  height: min(844px, 98vh);
+  height: min(844px, 98dvh);
   display: flex;
   flex-direction: column;
   border-left: 3px solid var(--wood);
