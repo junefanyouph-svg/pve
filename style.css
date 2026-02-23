@@ -116,7 +116,7 @@ html, body {
   display: flex;
   flex-direction: column;
   background: var(--panel);
-  padding: 10px 12px 8px;
+  padding: 0 12px 8px;
   gap: 8px;
   overflow: hidden;
   min-height: 0;
@@ -345,44 +345,52 @@ html, body {
 
 /* ── Combo Meter ── */
 #combo-wrap {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
-  padding: 0 2px;
+  background: rgba(0,0,0,0.35);
+  border-radius: 0 0 4px 4px;
+  padding: 3px 6px;
+  border: 1.5px solid rgba(255,255,255,0.1);
+  border-top: none;
+  margin: 0 -12px;
+  padding: 4px 12px;
 }
 #combo-label {
   font-family: 'Fredoka One', cursive;
-  font-size: 12px;
-  color: #a0c080;
+  font-size: 11px;
+  color: var(--gold);
   letter-spacing: 1px;
   white-space: nowrap;
   flex-shrink: 0;
 }
 #combo-bar-bg {
   flex: 1;
-  height: 10px;
+  height: 8px;
   background: rgba(0,0,0,0.3);
-  border-radius: 5px;
-  border: 1.5px solid rgba(255,255,255,0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.1);
   overflow: hidden;
 }
 #combo-bar {
   height: 100%;
   width: 0%;
   background: linear-gradient(90deg, #e8a020, #ffdd44);
-  border-radius: 5px;
+  border-radius: 4px;
   transition: width 0.15s, background 0.3s;
 }
 #combo-bar.hot { background: linear-gradient(90deg, #ff6600, #ffcc00); }
 #combo-count {
   font-family: 'Fredoka One', cursive;
-  font-size: 15px;
+  font-size: 13px;
   color: var(--gold);
-  min-width: 32px;
-  text-align: right;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  pointer-events: none;
   flex-shrink: 0;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  min-width: 28px;
+  text-align: right;
 }
 #combo-count.popping {
   animation: comboPop 0.3s ease-out;

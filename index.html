@@ -51,7 +51,11 @@
 
   <!-- Word panel -->
   <div id="word-panel">
-    <div id="panel-header">🌻 Spell a Word to Attack! 🌻</div>
+    <div id="combo-wrap">
+      <span id="combo-label">🔥 Combo</span>
+      <div id="combo-bar-bg"><div id="combo-bar"></div></div>
+      <span id="combo-count">×1.0</span>
+    </div>
 
     <div id="word-display-wrap">
       <div id="word-display">
@@ -67,13 +71,8 @@
     </div>
 
     <div id="letters-wrap"></div>
-
     <div id="feedback"></div>
-    <div id="combo-wrap">
-      <span id="combo-label">🔥 COMBO</span>
-      <div id="combo-bar-bg"><div id="combo-bar"></div></div>
-      <span id="combo-count">×0</span>
-    </div>
+
   </div>
 
   <!-- Hidden GIF cache: DOM img elements keep GIFs animated so canvas can read live frames -->
