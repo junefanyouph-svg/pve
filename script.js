@@ -168,10 +168,10 @@
     enemyTankAttack:  makeImg("assets/enemy3_attack.gif"),
 
     // ── Background — seasonal, loops every 4 stages ──
-    bgWinter: makeImg("assets/bg/winter.png"),
-    bgAutumn: makeImg("assets/bg/autumn.png"),
-    bgSpring: makeImg("assets/bg/spring.png"),
-    bgSummer: makeImg("assets/bg/summer.png"),
+    bgWinter: makeImg("assets/bg/winter_cmp.png"),
+    bgAutumn: makeImg("assets/bg/autumn_cmp.png"),
+    bgSpring: makeImg("assets/bg/spring_cmp.png"),
+    bgSummer: makeImg("assets/bg/summer_cmp.png"),
   };
   // ============================================================
   // END ASSET CONFIGURATION
