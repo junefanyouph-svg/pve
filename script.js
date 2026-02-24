@@ -1259,6 +1259,7 @@
         if (!e || e.x === undefined) continue;
         // Word-shots home toward their target enemy; regular shots hit any enemy
         if (b.isWordShot && b.targetId !== e.id) continue;
+        if (e.state === "dying") continue; // already dead — ignore all hits
         if (Math.hypot(b.x - e.x, b.y - e.y) < b.r + e.r) {
           const dmgAmt = b.isWordShot ? b.wordDmg : 1;
           e.hp -= dmgAmt;
@@ -1286,7 +1287,7 @@
             _removeGifEl("enemy-" + e.id);
             e.state = "dying";
             e.dyingTimer = 0.8;
-            e.hp = 1;
+            e.hp = 0;
           }
           break;
         }
@@ -1308,8 +1309,12 @@
       if (e.state === "dying") {
         e.dyingTimer -= dt;
         e.moving = false;
-        if (e.dyingTimer <= 0) {
+        const fadeAlpha = Math.max(0, e.dyingTimer / 0.8);
+        // Hide the GIF overlay the moment it's fully faded to prevent loop flicker
+        if (fadeAlpha === 0) {
           _removeGifEl("enemy-" + e.id);
+        }
+        if (e.dyingTimer <= 0) {
           enemies.splice(i, 1);
         }
         continue; // skip all other logic while dying
@@ -1612,40 +1617,43 @@
 
     // Enemies
     for (const e of enemies) {
-      ctx.save();
-      if (e.hitFlash > 0) {
-        ctx.globalAlpha = 0.5 + 0.5 * Math.sin(e.hitFlash * 40);
-      }
-      drawShadow(e.x, e.y, e.spriteR);
       if (e.state === "dying") {
+        // Fade from fully opaque to fully transparent over the dying duration
+        const fadeAlpha = Math.max(0, e.dyingTimer / 0.8);
         drawSprite(
           e.dyingAsset,
           e.emoji,
           e.x,
           e.y,
           e.spriteR * 2.4,
-          Math.max(0.1, e.dyingTimer / 0.8),
+          fadeAlpha,
           null,
           false,
           "enemy-" + e.id,
           null,
           false,
         );
-      } else {
-        drawSprite(
-          e.asset,
-          e.emoji,
-          e.x,
-          e.y,
-          e.spriteR * 2.4,
-          1,
-          e.walkAsset,
-          e.state === "walk",
-          "enemy-" + e.id,
-          e.attackAsset,
-          e.state === "attack",
-        );
+        // No shadow, no HP bar, no hit-flash while dying
+        continue;
       }
+      ctx.save();
+      if (e.hitFlash > 0) {
+        ctx.globalAlpha = 0.5 + 0.5 * Math.sin(e.hitFlash * 40);
+      }
+      drawShadow(e.x, e.y, e.spriteR);
+      drawSprite(
+        e.asset,
+        e.emoji,
+        e.x,
+        e.y,
+        e.spriteR * 2.4,
+        1,
+        e.walkAsset,
+        e.state === "walk",
+        "enemy-" + e.id,
+        e.attackAsset,
+        e.state === "attack",
+      );
       ctx.restore();
       drawHPBar(e.x, e.y, e.spriteR, e.hp, e.maxHp);
     }
@@ -1811,4 +1819,4 @@
 
   nextStageBtn.addEventListener('click', onNextStageBtnClick);
   document.getElementById('stage-start-btn').addEventListener('click', advanceStage);
-})();
+})();git 
