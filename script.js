@@ -699,17 +699,18 @@
 
       // Fire a word-powered projectile at every enemy on screen
       if (enemies.length > 0) {
-        const token = stageToken;
+        const shotToken = stageToken;
         enemies.forEach((e, idx) => {
           const a = Math.atan2(e.y - player.y, e.x - player.x);
           const delay = idx * 60;
           const wordDmg = Math.round(dmg * comboMult);
           setTimeout(() => {
-            if (!running || stageToken !== token) return; // stale — bail
+            if (!running || stageToken !== shotToken) return; // stale — bail
+            if (!player) return;
             player.attacking = true;
             setTimeout(() => {
-              if (stageToken !== token) return;
-              player.attacking = false;
+              if (stageToken !== shotToken) return;
+              if (player) player.attacking = false;
             }, 300);
             bullets.push({
               x: player.x,
@@ -738,9 +739,9 @@
         showFeedback("⚡ " + word.toUpperCase() + "! +" + totalDmg + multStr, "hit");
       }
 
-      const token = stageToken;
+      const genToken = stageToken;
       setTimeout(() => {
-        if (stageToken !== token) return; // stage changed — don't regenerate
+        if (stageToken !== genToken) return; // stage changed — don't regenerate
         generateNewLetters();
       }, 380);
     } else {
@@ -1068,6 +1069,7 @@
     // Bullets (knives)
     for (let i = bullets.length - 1; i >= 0; i--) {
       const b = bullets[i];
+      if (!b || b.x === undefined) { bullets.splice(i, 1); continue; }
       b.x += b.vx * dt;
       b.y += b.vy * dt;
       b.life -= dt;
