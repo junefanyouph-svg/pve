@@ -120,12 +120,15 @@
     // ── Enemies ──
     enemyBasic:       makeImg("assets/enemy1_running.gif"),
     enemyBasicWalk:   makeImg("assets/enemy1_running.gif"),
+    enemyBasicIdle:   makeImg("assets/enemy1_idle.gif"),
     enemyBasicAttack: makeImg("assets/enemy1_attack.gif"),
     enemyFast:        makeImg("assets/enemy2_running.gif"),
     enemyFastWalk:    makeImg("assets/enemy2_running.gif"),
+    enemyFastIdle:    makeImg("assets/enemy2_idle.gif"),
     enemyFastAttack:  makeImg("assets/enemy2_attack.gif"),
     enemyTank:        makeImg("assets/enemy3_running.gif"),
     enemyTankWalk:    makeImg("assets/enemy3_running.gif"),
+    enemyTankIdle:    makeImg("assets/enemy3_idle.gif"),
     enemyTankAttack:  makeImg("assets/enemy3_attack.gif"),
 
     // ── Background — seasonal, loops every 4 stages ──
@@ -264,6 +267,7 @@
   let stageClearPending = false;
   let stageBtnVisible = false; // true only when the next-stage button is actually showing
   let playerRunningOut = false; // true while player auto-runs off screen after stage clear
+  let playerRunningIn = false;  // true while player runs onto screen before battle starts
   let stageToken = 0; // incremented each stage — stale callbacks check this and bail
   let isSubmitting = false; // prevent double-submit on fast drag release
   let running = false,
@@ -295,7 +299,11 @@
 
   function initGame() {
     resizeCanvas();
-    player = { x: W * 0.2, y: H * 0.6, r: 30, angle: 0 }; // start mid-ground
+    player = { x: -60, y: H * 0.6, r: 14, angle: 0 };
+    playerRunningIn = true;
+    isStartBattleMode = false;
+    document.getElementById("word-panel").style.opacity = "0.4";
+    document.getElementById("word-panel").style.pointerEvents = "none";
     enemies = [];
     bullets = [];
     particles = [];
@@ -798,9 +806,11 @@
   // ── Enemy helpers ─────────────────────────────────────────────────────────
   const ETYPES = {
     basic: {
-      r: 25,
+      r: 16,
+      spriteR: 25,
       asset: "enemyBasic",
       walkAsset: "enemyBasicWalk",
+      idleAsset: "enemyBasicIdle",
       attackAsset: "enemyBasicAttack",
       emoji: "🐺",
       speedMult: 1.0,
@@ -810,9 +820,11 @@
       attackCooldown: 1.2,
     },
     fast: {
-      r: 18,
+      r: 12,
+      spriteR: 18,
       asset: "enemyFast",
       walkAsset: "enemyFastWalk",
+      idleAsset: "enemyFastIdle",
       attackAsset: "enemyFastAttack",
       emoji: "🦊",
       speedMult: 1.9,
@@ -822,9 +834,11 @@
       attackCooldown: 0.8,
     },
     tank: {
-      r: 30,
+      r: 22,
+      spriteR: 30,
       asset: "enemyTank",
       walkAsset: "enemyTankWalk",
+      idleAsset: "enemyTankIdle",
       attackAsset: "enemyTankAttack",
       emoji: "🐗",
       speedMult: 0.55,
@@ -850,8 +864,10 @@
       x,
       y,
       r: t.r,
+      spriteR: t.spriteR,
       asset: t.asset,
       walkAsset: t.walkAsset,
+      idleAsset: t.idleAsset,
       attackAsset: t.attackAsset,
       emoji: t.emoji,
       hp,
@@ -861,9 +877,9 @@
       points: t.points,
       attackDmg: t.attackDmg,
       attackCooldown: t.attackCooldown,
-      attackTimer: 0,       // counts down to next attack
-      attacking: false,     // true while playing attack animation
-      attackAnimTimer: 0,   // how long the attack anim plays
+      attackTimer: 0,
+      state: "walk",   // walk | idle | attack
+      attackAnimTimer: 0,
       hitFlash: 0,
       moving: true,
       id: ++_spriteIdCounter,
@@ -942,11 +958,18 @@
     }, 1000);
   }
 
+  let isStartBattleMode = false; // true when next-stage btn is acting as start-battle
+
   function onNextStageBtnClick() {
     nextStageBtn.style.display = "none";
-    playerRunningOut = true;
-    player.moving = true;
-    // The update loop will auto-run the player right; once off-screen, showStageIntro() fires
+    stageBtnVisible = false;
+    if (isStartBattleMode) {
+      isStartBattleMode = false;
+      advanceStage();
+    } else {
+      playerRunningOut = true;
+      player.moving = true;
+    }
   }
 
   function showStageIntro() {
@@ -962,36 +985,42 @@
       stage++;
     }
 
-    const isWorldStart = stage === 1;
-    const titleEl = document.getElementById("stage-intro-title");
-    const subEl = document.getElementById("stage-intro-sub");
-    titleEl.textContent = isWorldStart
-      ? "🌍 World " + world + " — Stage " + world + "-" + stage
-      : "⚔️ Stage " + world + "-" + stage;
-    subEl.textContent = "Kills needed: " + Math.round(6 * Math.pow(2, (world - 1) * STAGES_PER_WORLD + (stage - 1)));
-    stageIntroEl.style.display = "flex";
+    // Hide any leftover overlays
+    stageIntroEl.style.display = "none";
+
+    // Place player off-screen left and run them in
+    player.x = -player.r * 2;
+    player.y = H * 0.6;
+    player.moving = true;
+    player.attacking = false;
+    playerRunningIn = true;
   }
 
   function advanceStage() {
-    stageIntroEl.style.display = "none";
+    nextStageBtn.style.display = "none";
+    nextStageBtn.textContent = "➡️ Next Stage"; // reset label
     stageClearPending = false;
     stageBtnVisible = false;
+    playerRunningIn = false; // player is already in position
+    isStartBattleMode = false;
     stageKills = 0;
     stageEnemiesSpawned = 0;
-    stageToken++; // cancel any stale callbacks from previous stage
+    stageToken++;
 
-    // Reset player to left side
-    player.x = W * 0.2;
-    player.y = H * 0.6;
+    // Player stays at their current position (already ran in)
     player.moving = false;
     player.attacking = false;
     jDx = 0; jDy = 0; jActive = false; jTouchId = null;
     Object.keys(keys).forEach(k => keys[k] = false);
 
     enemies = [];
-    bullets = []; // clear any in-flight word-shots from previous stage
+    bullets = [];
+    isDragging = false;
+    dragPos = null;
+    selectedIndices = [];
     document.getElementById("word-panel").style.opacity = "";
     document.getElementById("word-panel").style.pointerEvents = "";
+    isSubmitting = false;
 
     updateHUD();
     updateComboUI();
@@ -1017,7 +1046,25 @@
       return; // skip all other update logic during run-off
     }
 
-    if (stageClearPending && stageBtnVisible) return; // fully paused — button is showing, waiting for click
+    // Player run-in animation before battle starts
+    if (playerRunningIn) {
+      player.moving = true;
+      player.attacking = false;
+      player.x += 220 * dt; // run rightward onto screen
+      // Once player reaches ~25% of screen, stop and show start button
+      if (player.x >= W * 0.25) {
+        player.x = W * 0.25;
+        player.moving = false;
+        playerRunningIn = false;
+        isStartBattleMode = true;
+        nextStageBtn.textContent = "⚔️ Start Battle!";
+        nextStageBtn.style.display = "block";
+        stageBtnVisible = true;
+      }
+      return;
+    }
+
+    if ((stageClearPending && stageBtnVisible) || isStartBattleMode) return; // paused — waiting for button click
 
     // Player movement — left half
     let mx = jDx,
@@ -1036,7 +1083,7 @@
     player.y = Math.max(H * 0.2 + player.r, Math.min(H - player.r, player.y + my * diff.playerSpeed * dt));
 
     // Auto-shoot and spawn only when stage is active
-    if (!stageClearPending) {
+    if (!stageClearPending && !playerRunningIn) {
       // Auto-shoot knife toward nearest enemy
       const ATTACK_RANGE = W * 0.8;
       const target = nearestEnemy();
@@ -1123,16 +1170,47 @@
       if (!e || e.x === undefined) continue;
 
       const distToPlayer = Math.hypot(e.x - player.x, e.y - player.y);
-      const ATTACK_REACH = e.r + player.r + 8;
+      const ATTACK_REACH = e.r + player.r + 2; // minimal hitbox — only actual overlap
 
-      if (e.attacking) {
-        // Play attack animation for 0.5s, then deal damage and cooldown
-        e.attackAnimTimer -= dt;
+      if (e.hitFlash > 0) e.hitFlash -= dt;
+      if (e.attackTimer > 0) e.attackTimer -= dt;
+
+      if (e.state === "walk") {
+        const a = Math.atan2(player.y - e.y, player.x - e.x);
+        if (distToPlayer > ATTACK_REACH) {
+          e.x += Math.cos(a) * e.speed * dt;
+          e.y += Math.sin(a) * e.speed * dt;
+          e.moving = true;
+        } else {
+          // Arrived — switch to idle before attacking
+          e.state = "idle";
+          e.moving = false;
+          e.attackAnimTimer = 0.3; // brief idle pause
+        }
+
+      } else if (e.state === "idle") {
         e.moving = false;
+        e.attackAnimTimer -= dt;
         if (e.attackAnimTimer <= 0) {
-          e.attacking = false;
-          e.attackTimer = e.attackCooldown;
-          // Deal damage if still in reach
+          if (distToPlayer <= ATTACK_REACH + 10 && e.attackTimer <= 0) {
+            // Still in range — attack
+            e.state = "attack";
+            e.attackAnimTimer = 0.55;
+          } else if (distToPlayer > ATTACK_REACH + 10) {
+            // Player moved away — go back to walking
+            e.state = "walk";
+            e.moving = true;
+          } else {
+            // In range but still on cooldown — keep idling
+            e.attackAnimTimer = 0.2;
+          }
+        }
+
+      } else if (e.state === "attack") {
+        e.moving = false;
+        e.attackAnimTimer -= dt;
+        if (e.attackAnimTimer <= 0) {
+          // Attack lands — deal damage if still close
           if (distToPlayer < ATTACK_REACH + 12) {
             health -= e.attackDmg;
             burst(player.x, player.y, "#c0392b", 6);
@@ -1144,26 +1222,12 @@
             }
             updateHUD();
           }
-        }
-      } else {
-        // Move toward player
-        if (e.attackTimer > 0) e.attackTimer -= dt;
-        const a = Math.atan2(player.y - e.y, player.x - e.x);
-
-        if (distToPlayer > ATTACK_REACH) {
-          // Walk toward player
-          e.x += Math.cos(a) * e.speed * dt;
-          e.y += Math.sin(a) * e.speed * dt;
-          e.moving = true;
-        } else if (e.attackTimer <= 0) {
-          // In range and cooldown ready — start attack
-          e.attacking = true;
-          e.attackAnimTimer = 0.5;
-          e.moving = false;
+          e.attackTimer = e.attackCooldown;
+          // Return to idle — will check range again from there
+          e.state = "idle";
+          e.attackAnimTimer = 0.3;
         }
       }
-
-      if (e.hitFlash > 0) e.hitFlash -= dt;
     }
 
     // Particles
@@ -1343,14 +1407,14 @@
       playerAnimAsset &&
       playerAnimAsset.src &&
       playerAnimAsset.src.toLowerCase().includes(".gif");
-    drawShadow(player.x, player.y, player.r);
+    drawShadow(player.x, player.y, 30);
     if (playerAnimIsGif) {
       drawSprite(
         "player",
         PLAYER_EMOJI,
         player.x,
         player.y,
-        player.r * 2.4,
+        72,
         1,
         playerAnimKey,
         true,
@@ -1362,14 +1426,14 @@
         PLAYER_EMOJI,
         player.x,
         player.y,
-        player.r * 2.4,
+        72,
         1,
         "playerWalk",
         player.moving,
         "player",
       );
     }
-    drawHPBar(player.x, player.y, player.r, health, 100);
+    drawHPBar(player.x, player.y, 30, health, 100);
 
     // Bullets — LINE 444: ASSETS.knife image or fallback emoji
     const knifeSrc = ASSETS.knife;
@@ -1405,23 +1469,22 @@
       if (e.hitFlash > 0) {
         ctx.globalAlpha = 0.5 + 0.5 * Math.sin(e.hitFlash * 40);
       }
-      drawShadow(e.x, e.y, e.r);
-      // Enemy idle: ASSETS.enemyBasic/Fast/Tank (LINES 545/547/549) | walk GIF: LINES 546/548/550
+      drawShadow(e.x, e.y, e.spriteR);
       drawSprite(
-        e.asset,
+        e.idleAsset || e.asset,
         e.emoji,
         e.x,
         e.y,
-        e.r * 2.4,
+        e.spriteR * 2.4,
         1,
         e.walkAsset,
-        e.moving,
+        e.state === "walk",
         "enemy-" + e.id,
         e.attackAsset,
-        e.attacking,
+        e.state === "attack",
       );
       ctx.restore();
-      drawHPBar(e.x, e.y, e.r, e.hp, e.maxHp);
+      drawHPBar(e.x, e.y, e.spriteR, e.hp, e.maxHp);
     }
 
     // Particles (leaf / star bursts)
