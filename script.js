@@ -1,6 +1,43 @@
 (function () {
+  // ── Loading tracker ───────────────────────────────────────────────────────
+  let _loadTotal = 0;
+  let _loadDone  = 0;
+  function _trackImg(img) {
+    _loadTotal++;
+    const finish = () => { _loadDone++; _updateLoadBar(); };
+    if (img.complete) { finish(); }
+    else { img.addEventListener('load', finish); img.addEventListener('error', finish); }
+    return img;
+  }
+  function _updateLoadBar() {
+    const pct = _loadTotal === 0 ? 100 : Math.round((_loadDone / _loadTotal) * 100);
+    const bar = document.getElementById('loading-bar');
+    const lbl = document.getElementById('loading-label');
+    if (bar) bar.style.width = pct + '%';
+    if (lbl) lbl.textContent = pct < 100 ? 'Loading assets... ' + pct + '%' : 'Ready!';
+    if (pct >= 100 && _wordsReady) _onAllLoaded();
+  }
+  let _wordsReady = false;
+  function _markWordsReady() {
+    _wordsReady = true;
+    _updateLoadBar();
+  }
+  function _onAllLoaded() {
+    // Only fire once
+    if (_onAllLoaded._fired) return;
+    _onAllLoaded._fired = true;
+    const loadScreen = document.getElementById('loading-screen');
+    const landScreen = document.getElementById('landing-screen');
+    setTimeout(() => {
+      loadScreen.style.opacity = '0';
+      setTimeout(() => {
+        loadScreen.style.display = 'none';
+        landScreen.style.display = 'flex';
+      }, 500);
+    }, 300);
+  }
+
   // ── Word list ─────────────────────────────────────────────────────────────
-  // VALID_WORDS loaded from CDN — starts as empty Set, filled on fetch
   let VALID_WORDS = new Set();
   let wordsLoaded = false;
 
@@ -12,11 +49,11 @@
       const arr = await res.json();
       VALID_WORDS = new Set(arr.filter((w) => w.length >= 3));
       wordsLoaded = true;
-      console.log("Word list loaded:", VALID_WORDS.size, "words");
     } catch (e) {
       console.error("Failed to load word list:", e);
-      wordsLoaded = true; // allow play with empty set rather than blocking
+      wordsLoaded = true;
     }
+    _markWordsReady();
   })();
 
   const LETTER_POOL =
@@ -87,18 +124,17 @@
   // makeImg() creates a real <img> tag inside a hidden DOM container so the browser
   // keeps the GIF running; drawImage() then reads the current live frame each tick.
   function makeImg(src) {
-    // Creates a plain Image for static assets (png/jpg)
     const el = new Image();
     el.src = src;
+    _trackImg(el);
     return el;
   }
   function makeGif(src) {
-    // Creates a real DOM <img> for GIFs — browser animates it natively,
-    // and we position it via CSS overlay instead of drawing to canvas
     const el = document.createElement("img");
     el.src = src;
-    el.style.display = "none"; // hidden until placed by positionSprite
+    el.style.display = "none";
     document.getElementById("gif-cache").appendChild(el);
+    _trackImg(el);
     return el;
   }
 
@@ -1506,6 +1542,42 @@
     return v;
   }
 
+  // ── Screen navigation ─────────────────────────────────────────────────────
+  const landingEl    = document.getElementById('landing-screen');
+  const optionsEl    = document.getElementById('options-screen');
+
+  function showGameScreens() {
+    landingEl.style.display  = 'none';
+    optionsEl.style.display  = 'none';
+  }
+
+  function showLanding() {
+    running = false;
+    if (raf) cancelAnimationFrame(raf);
+    overlay.style.display    = 'none';
+    optionsEl.style.display  = 'none';
+    landingEl.style.display  = 'flex';
+  }
+
+  // Play button
+  document.getElementById('play-btn').addEventListener('click', () => {
+    showGameScreens();
+    // Small delay so layout reflow happens before canvas resize
+    setTimeout(window.__start, 50);
+  });
+
+  // Options button
+  document.getElementById('options-btn').addEventListener('click', () => {
+    landingEl.style.display = 'none';
+    optionsEl.style.display = 'flex';
+  });
+
+  // Back from options
+  document.getElementById('options-back-btn').addEventListener('click', () => {
+    optionsEl.style.display = 'none';
+    landingEl.style.display = 'flex';
+  });
+
   // ── Loop ──────────────────────────────────────────────────────────────────
   function loop(ts) {
     if (!running) return;
@@ -1520,31 +1592,27 @@
     running = false;
     if (raf) cancelAnimationFrame(raf);
     overlay.innerHTML =
-      "<h1>🐄 Game Over! 🌾</h1>" +
-      '<p class="stat">Stage → ' +
-      world +
-      "-" +
-      stage +
-      "<br>Score → " +
-      score +
-      "<br>Kills → " +
-      kills +
-      "</p>" +
-      '<button class="tap-btn" onclick="window.__start()">🌱 Try Again!</button>';
-    overlay.style.display = "flex";
+      '<div style="font-family:\'Fredoka One\',cursive;font-size:32px;color:#e8a020;text-align:center;line-height:1.2;text-shadow:0 3px 0 rgba(0,0,0,0.4)">🐄 Game Over! 🌾</div>' +
+      '<p class="stat">Stage → ' + world + '-' + stage +
+      '<br>Score → ' + score +
+      '<br>Kills → ' + kills + '</p>' +
+      '<button class="tap-btn" onclick="window.__start()" style="margin-top:8px">🌱 Try Again!</button>' +
+      '<button class="tap-btn" onclick="window.__mainMenu()" style="margin-top:4px;background:#7a5030;border-color:#5a3010">🏠 Main Menu</button>';
+    overlay.style.display = 'flex';
   }
 
   window.__start = function () {
-    overlay.style.display = "none";
+    overlay.style.display = 'none';
     initGame();
     running = true;
     lastTs = performance.now();
     raf = requestAnimationFrame(loop);
   };
 
-  document
-    .getElementById("start-btn")
-    .addEventListener("click", window.__start);
-  nextStageBtn.addEventListener("click", onNextStageBtnClick);
-  document.getElementById("stage-start-btn").addEventListener("click", advanceStage);
+  window.__mainMenu = function () {
+    showLanding();
+  };
+
+  nextStageBtn.addEventListener('click', onNextStageBtnClick);
+  document.getElementById('stage-start-btn').addEventListener('click', advanceStage);
 })();

@@ -14,13 +14,54 @@
 <body>
 <div id="app">
 
-  <!-- Game area (takes most of the screen) -->
+  <!-- ── Loading Screen ── -->
+  <div id="loading-screen">
+    <div id="loading-inner">
+      <div id="loading-logo">🐄</div>
+      <div id="loading-title">Farm Frenzy<br>Words</div>
+      <div id="loading-bar-wrap">
+        <div id="loading-bar"></div>
+      </div>
+      <div id="loading-label">Loading...</div>
+    </div>
+  </div>
+
+  <!-- ── Landing Screen ── -->
+  <div id="landing-screen" style="display:none">
+    <div id="landing-bg"></div>
+    <div id="landing-inner">
+      <div id="landing-logo">🐄</div>
+      <div id="landing-title">Farm Frenzy<br><span>Words</span></div>
+      <div id="landing-buttons">
+        <button class="landing-btn" id="play-btn">▶ Play</button>
+        <button class="landing-btn secondary" id="options-btn">⚙ Options</button>
+      </div>
+      <div id="landing-version">v0.1</div>
+    </div>
+  </div>
+
+  <!-- ── Options Screen ── -->
+  <div id="options-screen" style="display:none">
+    <div id="options-inner">
+      <div id="options-title">⚙ Options</div>
+      <div class="opt-row">
+        <span class="opt-label">Sound</span>
+        <button class="opt-toggle" id="opt-sound">ON</button>
+      </div>
+      <div class="opt-row">
+        <span class="opt-label">Difficulty</span>
+        <button class="opt-toggle" id="opt-diff">Normal</button>
+      </div>
+      <button class="landing-btn" id="options-back-btn">← Back</button>
+    </div>
+  </div>
+
+  <!-- Game area -->
   <div id="game-wrap">
     <canvas id="game-canvas"></canvas>
     <div id="sprite-layer"></div>
     <div id="stage-flash"></div>
 
-    <!-- HUD overlay (transparent, on top of game) -->
     <div id="hud">
       <div class="hb"><span class="hl">📍 Stage</span><span class="hv" id="ui-stage">1-1</span></div>
       <div class="hb"><span class="hl">⭐ Score</span><span class="hv" id="ui-score">0</span></div>
@@ -28,20 +69,15 @@
       <div class="hb"><span class="hl">💀 Kills</span><span class="hv" id="ui-kills">0</span></div>
     </div>
 
-    <!-- Stage indicator overlay -->
     <div id="stage-indicator">
       <span class="stage-dot" id="sdot-1"></span>
       <span class="stage-dot" id="sdot-2"></span>
       <span class="stage-dot" id="sdot-3"></span>
     </div>
 
-    <!-- Kill progress bar -->
     <div id="kill-progress-wrap"><div id="kill-progress-bar"></div></div>
-
-    <!-- Next Stage Button -->
     <button id="next-stage-btn" style="display:none">➡️ Next Stage</button>
 
-    <!-- Stage Intro Overlay -->
     <div id="stage-intro" style="display:none">
       <div id="stage-intro-inner">
         <div id="stage-intro-title"></div>
@@ -80,17 +116,8 @@
   <!-- Hidden GIF cache -->
   <div id="gif-cache"></div>
 
-  <!-- Overlay -->
-  <div id="overlay">
-    <h1>🐄 Farm<br>Frenzy<br>Words 🌾</h1>
-    <p class="sub">
-      🐄 WASD / drag to move your animal<br>
-      🔤 Drag letters to spell words<br>
-      🔪 Strike to throw knives at enemies!<br>
-      🔄 Refresh for new letters anytime
-    </p>
-    <button class="tap-btn" id="start-btn">🌱 Start Farm!</button>
-  </div>
+  <!-- Game Over overlay (in-game only) -->
+  <div id="overlay" style="display:none"></div>
 </div>
 <script src="script.js"></script>
 </body>
