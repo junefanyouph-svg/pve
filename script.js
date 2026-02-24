@@ -166,7 +166,7 @@
     boom: makeGif("assets/player/boom.gif"),
 
     // ── Enemies ──
-    enemyBasic:       makeImg("assets/enemy/enemy1_running.gif"),
+    enemyBasic:       makeImg("./assets/enemy/enemy1_running.gif"),
     enemyBasicWalk:   makeImg("assets/enemy/enemy1/enemy1_running.gif"),
     enemyBasicIdle:   makeImg("assets/enemy/enemy1/enemy1_idle.gif"),
     enemyBasicAttack: makeImg("assets/enemy/enemy1/enemy1_attack.gif"),
