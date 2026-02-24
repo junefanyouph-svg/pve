@@ -14,8 +14,8 @@
 <body>
 <div id="app">
 
-  <!-- ── Loading Screen ── -->
-  <div id="loading-screen">
+  <!-- ── Screen: Loading ── -->
+  <div class="screen" id="screen-loading">
     <div id="loading-inner">
       <div id="loading-logo">🐄</div>
       <div id="loading-title">Farm Frenzy<br>Words</div>
@@ -26,8 +26,8 @@
     </div>
   </div>
 
-  <!-- ── Landing Screen ── -->
-  <div id="landing-screen" style="display:none">
+  <!-- ── Screen: Landing ── -->
+  <div class="screen" id="screen-landing" style="display:none">
     <div id="landing-bg"></div>
     <div id="landing-inner">
       <div id="landing-logo">🐄</div>
@@ -40,8 +40,8 @@
     </div>
   </div>
 
-  <!-- ── Options Screen ── -->
-  <div id="options-screen" style="display:none">
+  <!-- ── Screen: Options ── -->
+  <div class="screen" id="screen-options" style="display:none">
     <div id="options-inner">
       <div id="options-title">⚙ Options</div>
       <div class="opt-row">
@@ -56,68 +56,74 @@
     </div>
   </div>
 
-  <!-- Game area -->
-  <div id="game-wrap">
-    <canvas id="game-canvas"></canvas>
-    <div id="sprite-layer"></div>
-    <div id="stage-flash"></div>
+  <!-- ── Screen: Game ── -->
+  <div class="screen" id="screen-game" style="display:none">
 
-    <div id="hud">
-      <div class="hb"><span class="hl">📍 Stage</span><span class="hv" id="ui-stage">1-1</span></div>
-      <div class="hb"><span class="hl">⭐ Score</span><span class="hv" id="ui-score">0</span></div>
-      <div class="hb"><span class="hl">❤️ HP</span><span class="hv" id="ui-health">100</span></div>
-      <div class="hb"><span class="hl">💀 Kills</span><span class="hv" id="ui-kills">0</span></div>
-    </div>
+    <!-- Game canvas area -->
+    <div id="game-wrap">
+      <canvas id="game-canvas"></canvas>
+      <div id="sprite-layer"></div>
+      <div id="stage-flash"></div>
 
-    <div id="stage-indicator">
-      <span class="stage-dot" id="sdot-1"></span>
-      <span class="stage-dot" id="sdot-2"></span>
-      <span class="stage-dot" id="sdot-3"></span>
-    </div>
-
-    <div id="kill-progress-wrap"><div id="kill-progress-bar"></div></div>
-    <button id="next-stage-btn" style="display:none">➡️ Next Stage</button>
-
-    <div id="stage-intro" style="display:none">
-      <div id="stage-intro-inner">
-        <div id="stage-intro-title"></div>
-        <div id="stage-intro-sub"></div>
-        <button class="tap-btn" id="stage-start-btn">⚔️ Start!</button>
+      <div id="hud">
+        <div class="hb"><span class="hl">📍 Stage</span><span class="hv" id="ui-stage">1-1</span></div>
+        <div class="hb"><span class="hl">⭐ Score</span><span class="hv" id="ui-score">0</span></div>
+        <div class="hb"><span class="hl">❤️ HP</span><span class="hv" id="ui-health">100</span></div>
+        <div class="hb"><span class="hl">💀 Kills</span><span class="hv" id="ui-kills">0</span></div>
       </div>
-    </div>
-  </div>
 
-  <!-- Word panel -->
-  <div id="word-panel">
-    <div id="combo-wrap">
-      <span id="combo-label">🔥 Combo</span>
-      <div id="combo-bar-bg"><div id="combo-bar"></div></div>
-      <span id="combo-count">×1.0</span>
-    </div>
-
-    <div id="word-display-wrap">
-      <div id="word-display">
-        <span id="word-text"></span><span id="word-cursor"></span>
+      <div id="stage-indicator">
+        <span class="stage-dot" id="sdot-1"></span>
+        <span class="stage-dot" id="sdot-2"></span>
+        <span class="stage-dot" id="sdot-3"></span>
       </div>
-      <div id="dmg-preview"></div>
+
+      <div id="kill-progress-wrap"><div id="kill-progress-bar"></div></div>
+      <button id="next-stage-btn" style="display:none">➡️ Next Stage</button>
+
+      <div id="stage-intro" style="display:none">
+        <div id="stage-intro-inner">
+          <div id="stage-intro-title"></div>
+          <div id="stage-intro-sub"></div>
+          <button class="tap-btn" id="stage-start-btn">⚔️ Start!</button>
+        </div>
+      </div>
+
+      <!-- Game Over — inside game screen, not global overlay -->
+      <div id="overlay" style="display:none"></div>
     </div>
 
-    <div id="btn-row">
-      <button class="act-btn" id="shuffle-btn">🔀 Shuffle</button>
-      <button class="act-btn" id="refresh-btn">🔄 Refresh</button>
+    <!-- Word panel -->
+    <div id="word-panel">
+      <div id="combo-wrap">
+        <span id="combo-label">🔥 Combo</span>
+        <div id="combo-bar-bg"><div id="combo-bar"></div></div>
+        <span id="combo-count">×1.0</span>
+      </div>
+
+      <div id="word-display-wrap">
+        <div id="word-display">
+          <span id="word-text"></span><span id="word-cursor"></span>
+        </div>
+        <div id="dmg-preview"></div>
+      </div>
+
+      <div id="btn-row">
+        <button class="act-btn" id="shuffle-btn">🔀 Shuffle</button>
+        <button class="act-btn" id="refresh-btn">🔄 Refresh</button>
+      </div>
+
+      <div id="letter-connect-wrap">
+        <canvas id="letter-canvas"></canvas>
+      </div>
+      <div id="feedback"></div>
     </div>
 
-    <div id="letter-connect-wrap">
-      <canvas id="letter-canvas"></canvas>
-    </div>
-    <div id="feedback"></div>
-  </div>
+  </div><!-- /screen-game -->
 
-  <!-- Hidden GIF cache -->
+  <!-- Hidden GIF cache (always in DOM) -->
   <div id="gif-cache"></div>
 
-  <!-- Game Over overlay (in-game only) -->
-  <div id="overlay" style="display:none"></div>
 </div>
 <script src="script.js"></script>
 </body>

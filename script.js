@@ -23,17 +23,12 @@
     _updateLoadBar();
   }
   function _onAllLoaded() {
-    // Only fire once
     if (_onAllLoaded._fired) return;
     _onAllLoaded._fired = true;
-    const loadScreen = document.getElementById('loading-screen');
-    const landScreen = document.getElementById('landing-screen');
+    // Directly swap screens — no overlap, no fade, no flash
     setTimeout(() => {
-      loadScreen.style.opacity = '0';
-      setTimeout(() => {
-        loadScreen.style.display = 'none';
-        landScreen.style.display = 'flex';
-      }, 500);
+      document.getElementById('screen-loading').style.display = 'none';
+      document.getElementById('screen-landing').style.display = 'flex';
     }, 300);
   }
 
@@ -186,10 +181,11 @@
   // ── Canvas ────────────────────────────────────────────────────────────────
   const canvas = document.getElementById("game-canvas");
   const ctx = canvas.getContext("2d");
-  let W, H;
+  let W = 0, H = 0;
 
   function resizeCanvas() {
     const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return; // screen not visible yet
     const dpr = window.devicePixelRatio || 1;
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
@@ -197,7 +193,7 @@
     W = rect.width;
     H = rect.height;
   }
-  resizeCanvas();
+  // Do NOT call resizeCanvas() here — canvas is inside display:none screen
   window.addEventListener("resize", resizeCanvas);
 
   // ── UI refs ───────────────────────────────────────────────────────────────
@@ -334,7 +330,7 @@
   }
 
   function initGame() {
-    resizeCanvas();
+    if (W === 0) resizeCanvas(); // fallback in case not yet sized
     player = { x: -60, y: H * 0.6, r: 14, angle: 0 };
     playerRunningIn = true;
     isStartBattleMode = false;
@@ -1542,41 +1538,38 @@
     return v;
   }
 
-  // ── Screen navigation ─────────────────────────────────────────────────────
-  const landingEl    = document.getElementById('landing-screen');
-  const optionsEl    = document.getElementById('options-screen');
+  // ── Screen manager ────────────────────────────────────────────────────────
+  const SCREENS = ['screen-loading', 'screen-landing', 'screen-options', 'screen-game'];
 
-  function showGameScreens() {
-    landingEl.style.display  = 'none';
-    optionsEl.style.display  = 'none';
+  function showScreen(id) {
+    SCREENS.forEach(s => {
+      const el = document.getElementById(s);
+      if (el) el.style.display = s === id ? 'flex' : 'none';
+    });
   }
 
   function showLanding() {
     running = false;
     if (raf) cancelAnimationFrame(raf);
-    overlay.style.display    = 'none';
-    optionsEl.style.display  = 'none';
-    landingEl.style.display  = 'flex';
+    overlay.style.display = 'none';
+    showScreen('screen-landing');
   }
 
   // Play button
   document.getElementById('play-btn').addEventListener('click', () => {
-    showGameScreens();
-    // Small delay so layout reflow happens before canvas resize
-    setTimeout(window.__start, 50);
+    showScreen('screen-game');
+    // Force a synchronous reflow so getBoundingClientRect returns real dimensions
+    document.getElementById('screen-game').getBoundingClientRect();
+    resizeCanvas();
+    resizeLetterCanvas();
+    window.__start();
   });
 
   // Options button
-  document.getElementById('options-btn').addEventListener('click', () => {
-    landingEl.style.display = 'none';
-    optionsEl.style.display = 'flex';
-  });
+  document.getElementById('options-btn').addEventListener('click', () => showScreen('screen-options'));
 
   // Back from options
-  document.getElementById('options-back-btn').addEventListener('click', () => {
-    optionsEl.style.display = 'none';
-    landingEl.style.display = 'flex';
-  });
+  document.getElementById('options-back-btn').addEventListener('click', () => showScreen('screen-landing'));
 
   // ── Loop ──────────────────────────────────────────────────────────────────
   function loop(ts) {

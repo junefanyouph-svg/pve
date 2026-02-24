@@ -39,14 +39,27 @@ html, body {
 #app {
   width: 390px;
   height: min(844px, 98dvh);
-  display: flex;
-  flex-direction: column;
   border-left: 3px solid var(--wood);
   border-right: 3px solid var(--wood);
   position: relative;
   overflow: hidden;
   flex-shrink: 0;
   box-shadow: 0 0 40px rgba(0,0,0,0.6);
+  background: #1a3a1a;
+}
+
+/* Each screen fills #app completely */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Game screen lays out game-wrap + word-panel as a column */
+#screen-game {
+  flex-direction: column;
 }
 
 /* ── HUD overlay (inside game-wrap) ── */
@@ -107,8 +120,7 @@ html, body {
   flex: 0 0 35%;
   overflow: hidden;
   background: #000;
-}
-/* sprite-layer must not be clipped */
+}/* sprite-layer must not be clipped */
 #sprite-layer {
   overflow: visible !important;
 }
@@ -255,14 +267,10 @@ html, body {
 #feedback.miss { color: #e07060; }
 
 /* ── Loading Screen ── */
-#loading-screen {
-  position: absolute; inset: 0;
+#screen-loading {
   background: linear-gradient(160deg, #0d1f0e 0%, #1a3a1a 60%, #0a1a0a 100%);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 100;
-  transition: opacity 0.5s;
-}
-#loading-inner {
+  align-items: center; justify-content: center;
+}#loading-inner {
   display: flex; flex-direction: column;
   align-items: center; gap: 16px;
   width: 80%;
@@ -301,10 +309,8 @@ html, body {
 }
 
 /* ── Landing Screen ── */
-#landing-screen {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  z-index: 90;
+#screen-landing {
+  align-items: center; justify-content: center;
   overflow: hidden;
 }
 #landing-bg {
@@ -379,11 +385,9 @@ html, body {
 }
 
 /* ── Options Screen ── */
-#options-screen {
-  position: absolute; inset: 0;
+#screen-options {
   background: linear-gradient(160deg, #0d1f0e 0%, #1a3a1a 60%, #0a1a0a 100%);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 90;
+  align-items: center; justify-content: center;
 }
 #options-inner {
   display: flex; flex-direction: column;
