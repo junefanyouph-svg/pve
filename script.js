@@ -118,12 +118,15 @@
     knife: null,
 
     // ── Enemies ──
-    enemyBasic:     makeImg("assets/enemy1_running.gif"),
-    enemyBasicWalk: makeImg("assets/enemy1_running.gif"),
-    enemyFast:      makeImg("assets/enemy2_running.gif"),
-    enemyFastWalk:  makeImg("assets/enemy2_running.gif"),
-    enemyTank:      makeImg("assets/enemy3_running.gif"),
-    enemyTankWalk:  makeImg("assets/enemy3_running.gif"),
+    enemyBasic:       makeImg("assets/enemy1_running.gif"),
+    enemyBasicWalk:   makeImg("assets/enemy1_running.gif"),
+    enemyBasicAttack: makeImg("assets/enemy1_attack.gif"),
+    enemyFast:        makeImg("assets/enemy2_running.gif"),
+    enemyFastWalk:    makeImg("assets/enemy2_running.gif"),
+    enemyFastAttack:  makeImg("assets/enemy2_attack.gif"),
+    enemyTank:        makeImg("assets/enemy3_running.gif"),
+    enemyTankWalk:    makeImg("assets/enemy3_running.gif"),
+    enemyTankAttack:  makeImg("assets/enemy3_attack.gif"),
 
     // ── Background — seasonal, loops every 4 stages ──
     bgWinter: makeImg("assets/bg/winter.png"),
@@ -798,28 +801,37 @@
       r: 25,
       asset: "enemyBasic",
       walkAsset: "enemyBasicWalk",
+      attackAsset: "enemyBasicAttack",
       emoji: "🐺",
       speedMult: 1.0,
       hpBonus: 0,
       points: 10,
+      attackDmg: 10,
+      attackCooldown: 1.2,
     },
     fast: {
       r: 18,
       asset: "enemyFast",
       walkAsset: "enemyFastWalk",
+      attackAsset: "enemyFastAttack",
       emoji: "🦊",
       speedMult: 1.9,
       hpBonus: 0,
       points: 15,
+      attackDmg: 8,
+      attackCooldown: 0.8,
     },
     tank: {
       r: 30,
       asset: "enemyTank",
       walkAsset: "enemyTankWalk",
+      attackAsset: "enemyTankAttack",
       emoji: "🐗",
       speedMult: 0.55,
       hpBonus: 3,
       points: 30,
+      attackDmg: 18,
+      attackCooldown: 2.0,
     },
   };
 
@@ -840,16 +852,22 @@
       r: t.r,
       asset: t.asset,
       walkAsset: t.walkAsset,
+      attackAsset: t.attackAsset,
       emoji: t.emoji,
       hp,
       maxHp: hp,
       speed: diff.enemySpeed * t.speedMult,
       type,
       points: t.points,
+      attackDmg: t.attackDmg,
+      attackCooldown: t.attackCooldown,
+      attackTimer: 0,       // counts down to next attack
+      attacking: false,     // true while playing attack animation
+      attackAnimTimer: 0,   // how long the attack anim plays
       hitFlash: 0,
       moving: true,
       id: ++_spriteIdCounter,
-    }); // unique ID for GIF overlay element
+    });
   }
 
   function nearestEnemy() {
@@ -1014,19 +1032,8 @@
       mx /= ml;
       my /= ml;
     }
-    // Right boundary reduced to 30% of canvas (left 30% of screen)
-    player.x = Math.max(
-      player.r,
-      Math.min(W * 0.5 - player.r, player.x + mx * diff.playerSpeed * dt),
-    );
-    // Clamp Y so player never goes below ground level (75% of canvas height)
-    // Keep player inside the ground area (groundY=25% to bottom)
-    const groundTop = H * 0.25 + player.r;
-    const groundBottom = H - player.r;
-    player.y = Math.max(
-      groundTop,
-      Math.min(groundBottom, player.y + my * diff.playerSpeed * dt),
-    );
+    player.x = Math.max(player.r, Math.min(W - player.r, player.x + mx * diff.playerSpeed * dt));
+    player.y = Math.max(H * 0.2 + player.r, Math.min(H - player.r, player.y + my * diff.playerSpeed * dt));
 
     // Auto-shoot and spawn only when stage is active
     if (!stageClearPending) {
@@ -1114,26 +1121,49 @@
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
       if (!e || e.x === undefined) continue;
-      const a = Math.atan2(player.y - e.y, player.x - e.x);
-      e.x += Math.cos(a) * e.speed * dt;
-      e.y += Math.sin(a) * e.speed * dt;
-      if (e.hitFlash > 0) e.hitFlash -= dt;
-      if (Math.hypot(e.x - player.x, e.y - player.y) < e.r + player.r) {
-        health -= 10;
-        burst(player.x, player.y, "#c0392b", 8);
-        _removeGifEl("enemy-" + e.id);
-        enemies.splice(i, 1);
-        stageKills = Math.min(stageKills + 1, killsNeeded()); // enemy consumed — count it
-        kills++;
-        if (health <= 0) {
-          health = 0;
-          updateHUD();
-          endGame();
-          return;
+
+      const distToPlayer = Math.hypot(e.x - player.x, e.y - player.y);
+      const ATTACK_REACH = e.r + player.r + 8;
+
+      if (e.attacking) {
+        // Play attack animation for 0.5s, then deal damage and cooldown
+        e.attackAnimTimer -= dt;
+        e.moving = false;
+        if (e.attackAnimTimer <= 0) {
+          e.attacking = false;
+          e.attackTimer = e.attackCooldown;
+          // Deal damage if still in reach
+          if (distToPlayer < ATTACK_REACH + 12) {
+            health -= e.attackDmg;
+            burst(player.x, player.y, "#c0392b", 6);
+            if (health <= 0) {
+              health = 0;
+              updateHUD();
+              endGame();
+              return;
+            }
+            updateHUD();
+          }
         }
-        updateHUD();
-        checkStageClear();
+      } else {
+        // Move toward player
+        if (e.attackTimer > 0) e.attackTimer -= dt;
+        const a = Math.atan2(player.y - e.y, player.x - e.x);
+
+        if (distToPlayer > ATTACK_REACH) {
+          // Walk toward player
+          e.x += Math.cos(a) * e.speed * dt;
+          e.y += Math.sin(a) * e.speed * dt;
+          e.moving = true;
+        } else if (e.attackTimer <= 0) {
+          // In range and cooldown ready — start attack
+          e.attacking = true;
+          e.attackAnimTimer = 0.5;
+          e.moving = false;
+        }
       }
+
+      if (e.hitFlash > 0) e.hitFlash -= dt;
     }
 
     // Particles
@@ -1203,16 +1233,21 @@
     walkAssetKey,
     isMoving,
     spriteKey,
+    attackAssetKey,
+    isAttacking,
   ) {
-    const walkAsset = walkAssetKey ? ASSETS[walkAssetKey] : null;
-    const idleAsset = ASSETS[idleAssetKey];
+    const walkAsset   = walkAssetKey   ? ASSETS[walkAssetKey]   : null;
+    const attackAsset = attackAssetKey ? ASSETS[attackAssetKey] : null;
+    const idleAsset   = ASSETS[idleAssetKey];
 
-    const useWalk =
-      isMoving &&
-      walkAsset &&
-      walkAsset.src &&
-      walkAsset.src !== window.location.href;
-    const chosen = useWalk ? walkAsset : idleAsset;
+    let chosen;
+    if (isAttacking && attackAsset && attackAsset.src && attackAsset.src !== window.location.href) {
+      chosen = attackAsset;
+    } else if (isMoving && walkAsset && walkAsset.src && walkAsset.src !== window.location.href) {
+      chosen = walkAsset;
+    } else {
+      chosen = idleAsset;
+    }
     const isGif =
       chosen && chosen.src && chosen.src.toLowerCase().includes(".gif");
 
@@ -1382,6 +1417,8 @@
         e.walkAsset,
         e.moving,
         "enemy-" + e.id,
+        e.attackAsset,
+        e.attacking,
       );
       ctx.restore();
       drawHPBar(e.x, e.y, e.r, e.hp, e.maxHp);
