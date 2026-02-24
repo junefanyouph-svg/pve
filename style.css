@@ -69,7 +69,7 @@ html, body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 14px 5px;
+  padding: 6px 8px 5px 14px;
   background: rgba(60, 25, 10, 0.55);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
@@ -80,6 +80,58 @@ html, body {
 .hb { display: flex; flex-direction: column; align-items: center; gap: 0; }
 .hl { font-size: 9px; color: #d4a96a; letter-spacing: 1px; text-transform: uppercase; font-family: 'Fredoka One', cursive; }
 .hv { font-family: 'Fredoka One', cursive; font-size: 16px; color: var(--cream); line-height: 1; }
+
+#pause-btn {
+  pointer-events: all;
+  background: rgba(255,255,255,0.12);
+  border: 1.5px solid rgba(255,255,255,0.25);
+  border-radius: 8px;
+  color: var(--cream);
+  font-size: 16px;
+  padding: 3px 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.1s;
+  flex-shrink: 0;
+}
+#pause-btn:active { background: rgba(255,255,255,0.25); }
+
+/* ── Pause overlay ── */
+#pause-overlay {
+  position: absolute; inset: 0;
+  background: rgba(10, 20, 10, 0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+#pause-inner {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 14px;
+  width: 75%;
+}
+#pause-title {
+  font-family: 'Fredoka One', cursive;
+  font-size: 30px; color: var(--gold);
+  letter-spacing: 2px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+.pause-menu-btn {
+  width: 100%; padding: 13px 0;
+  font-family: 'Fredoka One', cursive;
+  font-size: 18px; letter-spacing: 1px;
+  border-radius: 10px; cursor: pointer;
+  touch-action: manipulation;
+  transition: all 0.12s;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.4);
+  background: linear-gradient(180deg, #5db84a, #3d8a2e);
+  color: var(--cream); border: 2.5px solid #2a6020;
+}
+.pause-menu-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.4); }
+.pause-menu-btn.secondary {
+  background: linear-gradient(180deg, #7a6040, #5a4020);
+  color: #e8c878; border-color: #3a2810; font-size: 15px;
+}
 
 /* ── Stage indicator overlay (inside game-wrap) ── */
 #stage-indicator {

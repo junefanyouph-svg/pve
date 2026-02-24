@@ -25,10 +25,23 @@
   function _onAllLoaded() {
     if (_onAllLoaded._fired) return;
     _onAllLoaded._fired = true;
-    // Directly swap screens — no overlap, no fade, no flash
     setTimeout(() => {
-      document.getElementById('screen-loading').style.display = 'none';
-      document.getElementById('screen-landing').style.display = 'flex';
+      const loading = document.getElementById('screen-loading');
+      const landing = document.getElementById('screen-landing');
+      // Fade out loading
+      loading.style.transition = 'opacity 0.4s';
+      loading.style.opacity = '0';
+      setTimeout(() => {
+        loading.style.display = 'none';
+        loading.style.opacity = '';
+        loading.style.transition = '';
+        // Fade in landing
+        landing.style.display = 'flex';
+        landing.style.opacity = '0';
+        landing.style.transition = 'opacity 0.4s';
+        requestAnimationFrame(() => { landing.style.opacity = '1'; });
+        setTimeout(() => { landing.style.transition = ''; }, 450);
+      }, 400);
     }, 300);
   }
 
@@ -145,22 +158,26 @@
     playerAttack:  makeImg("assets/player/player1_standingatk.gif"),
     playerRunAtk:  makeImg("assets/player/player1_runningatk.gif"),
 
+    // ── Potion ──
+    potion: makeImg("assets/potion.png"),
+
     // ── Projectile ──
-    knife: null,
+    knife: makeGif("assets/player/boom1.gif"),
+    boom: makeGif("assets/player/boom.gif"),
 
     // ── Enemies ──
-    enemyBasic:       makeImg("assets/enemy1_running.gif"),
-    enemyBasicWalk:   makeImg("assets/enemy1_running.gif"),
-    enemyBasicIdle:   makeImg("assets/enemy1_idle.gif"),
-    enemyBasicAttack: makeImg("assets/enemy1_attack.gif"),
-    enemyFast:        makeImg("assets/enemy2_running.gif"),
-    enemyFastWalk:    makeImg("assets/enemy2_running.gif"),
-    enemyFastIdle:    makeImg("assets/enemy2_idle.gif"),
-    enemyFastAttack:  makeImg("assets/enemy2_attack.gif"),
-    enemyTank:        makeImg("assets/enemy3_running.gif"),
-    enemyTankWalk:    makeImg("assets/enemy3_running.gif"),
-    enemyTankIdle:    makeImg("assets/enemy3_idle.gif"),
-    enemyTankAttack:  makeImg("assets/enemy3_attack.gif"),
+    enemyBasic:       makeImg("assets/enemy/enemy1/enemy1_running.gif"),
+    enemyBasicWalk:   makeImg("assets/enemy/enemy1/enemy1_running.gif"),
+    enemyBasicIdle:   makeImg("assets/enemy/enemy1/enemy1_idle.gif"),
+    enemyBasicAttack: makeImg("assets/enemy/enemy1/enemy1_attack.gif"),
+    enemyFast:        makeImg("assets/enemy/enemy2/enemy2_running.gif"),
+    enemyFastWalk:    makeImg("assets/enemy/enemy2/enemy2_running.gif"),
+    enemyFastIdle:    makeImg("assets/enemy/enemy2/enemy2_idle.gif"),
+    enemyFastAttack:  makeImg("assets/enemy/enemy2/enemy2_attack.gif"),
+    enemyTank:        makeImg("assets/enemy/enemy3/enemy3_running.gif"),
+    enemyTankWalk:    makeImg("assets/enemy/enemy3/enemy3_running.gif"),
+    enemyTankIdle:    makeImg("assets/enemy/enemy3/enemy3_idle.gif"),
+    enemyTankAttack:  makeImg("assets/enemy/enemy3/enemy3_attack.gif"),
 
     // ── Background — seasonal, loops every 4 stages ──
     bgWinter: makeImg("assets/bg/winter_cmp.png"),
@@ -284,7 +301,7 @@
   window.addEventListener("touchcancel", endJ);
 
   // ── Game State ────────────────────────────────────────────────────────────
-  let player, enemies, bullets, particles;
+  let player, enemies, bullets, particles, potions;
   let score, kills, health, shootTimer, spawnTimer;
   let world = 1,
     stage = 1; // current world & stage (e.g. 1-1)
@@ -304,7 +321,8 @@
   let isSubmitting = false; // prevent double-submit on fast drag release
   let running = false,
     raf = null,
-    lastTs = 0;
+    lastTs = 0,
+    paused = false;
   let bgOffset = 0;
   let _spriteIdCounter = 0;
 
@@ -319,13 +337,28 @@
 
   function getDiff() {
     const w = world;
+    const s = stage;
+    // Max enemies scales by 1.3^(world-1) per world
+    const worldMult = Math.pow(1.3, w - 1);
+
+    if (w === 1) {
+      return {
+        playerSpeed:  135,
+        shootInterval: Math.max(0.25, 0.65 - s * 0.1),
+        spawnInterval: Math.max(0.7, 1.5 - s * 0.25),
+        maxEnemies:   Math.round((2 + s * 2) * worldMult),
+        enemySpeed:   24 + s * 6,
+        enemyHp:      1 + s,
+      };
+    }
+    const wOffset = w - 2;
     return {
-      playerSpeed: 135,
-      shootInterval: Math.max(0.18, 0.65 - w * 0.04),
-      spawnInterval: Math.max(0.25, 1.1 - w * 0.08),
-      maxEnemies: 6 + w * 4,
-      enemySpeed: 28 + w * 9,
-      enemyHp: Math.round((1 + Math.floor(w / 2)) * 1.5),
+      playerSpeed:  135,
+      shootInterval: Math.max(0.2, 0.45 - wOffset * 0.02),
+      spawnInterval: Math.max(0.6, 1.2 - wOffset * 0.05),
+      maxEnemies:   Math.round((4 + wOffset) * worldMult),
+      enemySpeed:   30 + wOffset * 4,
+      enemyHp:      2 + wOffset,
     };
   }
 
@@ -339,6 +372,9 @@
     enemies = [];
     bullets = [];
     particles = [];
+    potions = [];
+    booms.forEach(b => b.el.remove());
+    booms = [];
     score = 0;
     kills = 0;
     health = 100;
@@ -356,6 +392,8 @@
     spawnTimer = 0;
     bgOffset = 0;
     combo = 0;
+    refreshCooldown = 0;
+    updateRefreshBtn();
     updateHUD();
     updateComboUI();
     showStageFlash("⚔️ Stage " + world + "-" + stage + " — Begin!");
@@ -829,10 +867,27 @@
     updateWordDisplay();
   });
 
+  let refreshCooldown = 0; // seconds remaining on cooldown
+  const REFRESH_CD = 10;
+
+  function updateRefreshBtn() {
+    const btn = document.getElementById("refresh-btn");
+    if (refreshCooldown > 0) {
+      btn.textContent = "🔄 " + Math.ceil(refreshCooldown) + "s";
+      btn.disabled = true;
+      btn.style.opacity = "0.5";
+    } else {
+      btn.textContent = "🔄 Refresh";
+      btn.disabled = false;
+      btn.style.opacity = "";
+    }
+  }
+
   document.getElementById("refresh-btn").addEventListener("click", () => {
-    if (stageClearPending || playerRunningOut) return;
-    breakCombo("letters refreshed");
+    if (stageClearPending || playerRunningOut || refreshCooldown > 0) return;
     generateNewLetters();
+    refreshCooldown = REFRESH_CD;
+    updateRefreshBtn();
   });
 
   // ── Enemy helpers ─────────────────────────────────────────────────────────
@@ -948,6 +1003,19 @@
     }
   }
 
+  let booms = [];
+  let _boomIdCounter = 0;
+
+  function spawnBoom(x, y) {
+    const el = document.createElement("img");
+    el.src = "assets/player/boom.gif";
+    el.style.cssText = "position:absolute;pointer-events:none;transform:translate(-50%,-50%);width:64px;height:64px;";
+    el.style.left = ((x / W) * 100).toFixed(2) + "%";
+    el.style.top  = ((y / H) * 100).toFixed(2) + "%";
+    document.getElementById("sprite-layer").appendChild(el);
+    booms.push({ el, life: 0.6 });
+  }
+
   function showStageFlash(text) {
     stageFlash.textContent = text;
     stageFlash.style.opacity = "1";
@@ -966,6 +1034,9 @@
     stageToken++; // invalidate all pending setTimeout callbacks from this stage
     enemies = [];
     bullets = []; // clear field — also kills any in-flight word-shots
+    potions = [];
+    booms.forEach(b => b.el.remove());
+    booms = [];
 
     // Clear selection and gray out the word panel immediately
     selectedIndices = [];
@@ -1047,6 +1118,9 @@
 
     enemies = [];
     bullets = [];
+    potions = [];
+    booms.forEach(b => b.el.remove());
+    booms = [];
     isDragging = false;
     dragPos = null;
     selectedIndices = [];
@@ -1064,6 +1138,12 @@
   function update(dt) {
     if (!player) return; // safety — player not initialized yet
     const diff = getDiff();
+
+    // Tick refresh cooldown
+    if (refreshCooldown > 0) {
+      refreshCooldown = Math.max(0, refreshCooldown - dt);
+      updateRefreshBtn();
+    }
 
     // Player run-off animation after stage clear button clicked
     if (playerRunningOut) {
@@ -1134,6 +1214,7 @@
             vx: Math.cos(a) * 420,
             vy: Math.sin(a) * 420,
             angle: a,
+            spin: 0,
             r: 10,
             life: 1.4,
           });
@@ -1159,6 +1240,7 @@
       b.x += b.vx * dt;
       b.y += b.vy * dt;
       b.life -= dt;
+      if (b.spin !== undefined) b.spin += dt * 12; // ~2 full rotations per second
       if (b.life <= 0 || b.x > W + 20 || b.y < -20 || b.y > H + 20) {
         bullets.splice(i, 1);
         continue;
@@ -1172,7 +1254,7 @@
           const dmgAmt = b.isWordShot ? b.wordDmg : 1;
           e.hp -= dmgAmt;
           e.hitFlash = 0.25;
-          burst(b.x, b.y, "#e8a020", b.isWordShot ? 10 : 4);
+          spawnBoom(b.x, b.y);
           bullets.splice(i, 1);
           if (b.isWordShot) {
             spawnDmgPop(e.x, e.y - e.r, "+" + dmgAmt + "💥");
@@ -1181,9 +1263,13 @@
             burst(e.x, e.y, "#ff9900", 14);
             _removeGifEl("enemy-" + e.id);
             const pts = (e.points || 10) * world;
+            // 30% chance to drop a potion
+            if (Math.random() < 0.05) {
+              potions.push({ x: e.x, y: e.y, r: 10, life: 12 }); // despawn after 12s
+            }
             enemies.splice(j, 1);
             score += pts;
-            stageKills = Math.min(stageKills + 1, killsNeeded()); // clamp — stray shots can't over-count
+            stageKills = Math.min(stageKills + 1, killsNeeded());
             kills++;
             updateHUD();
             checkStageClear();
@@ -1202,47 +1288,29 @@
       if (!e || e.x === undefined) continue;
 
       const distToPlayer = Math.hypot(e.x - player.x, e.y - player.y);
-      const ATTACK_REACH = e.r + player.r + 2; // minimal hitbox — only actual overlap
+      const ATTACK_REACH = e.r + player.r + 2;
 
       if (e.hitFlash > 0) e.hitFlash -= dt;
       if (e.attackTimer > 0) e.attackTimer -= dt;
 
       if (e.state === "walk") {
-        const a = Math.atan2(player.y - e.y, player.x - e.x);
         if (distToPlayer > ATTACK_REACH) {
+          const a = Math.atan2(player.y - e.y, player.x - e.x);
           e.x += Math.cos(a) * e.speed * dt;
           e.y += Math.sin(a) * e.speed * dt;
           e.moving = true;
-        } else {
-          // Arrived — switch to idle before attacking
-          e.state = "idle";
+        } else if (e.attackTimer <= 0) {
+          // In range and ready — attack immediately, no idle pause
+          e.state = "attack";
+          e.attackAnimTimer = 0.5;
           e.moving = false;
-          e.attackAnimTimer = 0.3; // brief idle pause
-        }
-
-      } else if (e.state === "idle") {
-        e.moving = false;
-        e.attackAnimTimer -= dt;
-        if (e.attackAnimTimer <= 0) {
-          if (distToPlayer <= ATTACK_REACH + 10 && e.attackTimer <= 0) {
-            // Still in range — attack
-            e.state = "attack";
-            e.attackAnimTimer = 0.55;
-          } else if (distToPlayer > ATTACK_REACH + 10) {
-            // Player moved away — go back to walking
-            e.state = "walk";
-            e.moving = true;
-          } else {
-            // In range but still on cooldown — keep idling
-            e.attackAnimTimer = 0.2;
-          }
         }
 
       } else if (e.state === "attack") {
         e.moving = false;
         e.attackAnimTimer -= dt;
         if (e.attackAnimTimer <= 0) {
-          // Attack lands — deal damage if still close
+          // Deal damage if still in reach
           if (distToPlayer < ATTACK_REACH + 12) {
             health -= e.attackDmg;
             burst(player.x, player.y, "#c0392b", 6);
@@ -1255,9 +1323,8 @@
             updateHUD();
           }
           e.attackTimer = e.attackCooldown;
-          // Return to idle — will check range again from there
-          e.state = "idle";
-          e.attackAnimTimer = 0.3;
+          // Back to walk — will re-enter attack immediately if still in range
+          e.state = "walk";
         }
       }
     }
@@ -1271,6 +1338,28 @@
       p.vy *= 0.86;
       p.life -= dt * 2;
       if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    // Potions — despawn over time, collect on player contact
+    for (let i = potions.length - 1; i >= 0; i--) {
+      const pot = potions[i];
+      pot.life -= dt;
+      if (pot.life <= 0) { potions.splice(i, 1); continue; }
+      if (Math.hypot(pot.x - player.x, pot.y - player.y) < pot.r + player.r + 8) {
+        health = Math.min(100, health + 25);
+        updateHUD();
+        showFeedback("❤️ +25 HP!", "hit");
+        burst(pot.x, pot.y, "#ff4466", 10);
+        potions.splice(i, 1);
+      }
+    }
+    // Booms (impact animations)
+    for (let i = booms.length - 1; i >= 0; i--) {
+      booms[i].life -= dt;
+      if (booms[i].life <= 0) {
+        booms[i].el.remove();
+        booms.splice(i, 1);
+      }
     }
     // Background is static — no scroll update
   }
@@ -1473,7 +1562,7 @@
       ctx.save();
       ctx.globalAlpha = Math.min(1, b.life);
       ctx.translate(b.x, b.y);
-      ctx.rotate(b.angle + Math.PI / 4);
+      ctx.rotate(b.angle + Math.PI / 4 + (b.spin || 0));
       if (b.isWordShot) {
         // Word-powered projectile: glowing golden star burst
         const s = 14 + (b.wordDmg / 10);
@@ -1484,8 +1573,13 @@
         ctx.textBaseline = "middle";
         ctx.fillText("⭐", 0, 0);
       } else if (knifeSrc && knifeSrc.complete && knifeSrc.naturalWidth > 0) {
-        // IMAGE PATH: draw knife image centered, rotated toward target (~18x18px)
-        ctx.drawImage(knifeSrc, -9, -9, 18, 18);
+        // IMAGE PATH: draw knife image centered, rotated toward target, keeping aspect ratio
+        const kW = knifeSrc.naturalWidth;
+        const kH = knifeSrc.naturalHeight;
+        const kScale = 18 / Math.max(kW, kH);
+        const dW = kW * kScale;
+        const dH = kH * kScale;
+        ctx.drawImage(knifeSrc, -dW / 2, -dH / 2, dW, dH);
       } else {
         ctx.font = "18px serif";
         ctx.textAlign = "center";
@@ -1503,7 +1597,7 @@
       }
       drawShadow(e.x, e.y, e.spriteR);
       drawSprite(
-        e.idleAsset || e.asset,
+        e.asset,
         e.emoji,
         e.x,
         e.y,
@@ -1527,6 +1621,27 @@
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
       ctx.fill();
+      ctx.restore();
+    }
+
+    // Potions
+    for (const pot of potions) {
+      const pulse = 1 + 0.12 * Math.sin(Date.now() / 200);
+      const alpha = Math.min(1, pot.life); // fade out in last second
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.92;
+      ctx.shadowColor = "#ff88aa";
+      ctx.shadowBlur = 10;
+      const potImg = ASSETS.potion;
+      const size = Math.round(32 * pulse);
+      if (potImg && potImg.complete && potImg.naturalWidth > 0) {
+        ctx.drawImage(potImg, pot.x - size / 2, pot.y - size / 2, size, size);
+      } else {
+        ctx.font = `${size}px serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("🧪", pot.x, pot.y);
+      }
       ctx.restore();
     }
 
@@ -1557,12 +1672,28 @@
 
   // Play button
   document.getElementById('play-btn').addEventListener('click', () => {
-    showScreen('screen-game');
-    // Force a synchronous reflow so getBoundingClientRect returns real dimensions
-    document.getElementById('screen-game').getBoundingClientRect();
-    resizeCanvas();
-    resizeLetterCanvas();
-    window.__start();
+    const landing = document.getElementById('screen-landing');
+    const game    = document.getElementById('screen-game');
+    // Fade out landing
+    landing.style.transition = 'opacity 0.35s';
+    landing.style.opacity = '0';
+    setTimeout(() => {
+      landing.style.display = 'none';
+      landing.style.opacity = '';
+      landing.style.transition = '';
+      // Show game screen and resize before starting
+      game.style.opacity = '0';
+      game.style.display = 'flex';
+      game.style.transition = 'opacity 0.35s';
+      // Force reflow so getBoundingClientRect has real dims
+      game.getBoundingClientRect();
+      resizeCanvas();
+      resizeLetterCanvas();
+      window.__start();
+      // Fade in game screen
+      requestAnimationFrame(() => { game.style.opacity = '1'; });
+      setTimeout(() => { game.style.transition = ''; }, 400);
+    }, 350);
   });
 
   // Options button
@@ -1571,9 +1702,42 @@
   // Back from options
   document.getElementById('options-back-btn').addEventListener('click', () => showScreen('screen-landing'));
 
+  // ── Pause ─────────────────────────────────────────────────────────────────
+  const pauseOverlay = document.getElementById('pause-overlay');
+
+  function pauseGame() {
+    if (!running || paused) return;
+    paused = true;
+    pauseOverlay.style.display = 'flex';
+    // Flush inputs so player doesn't drift on resume
+    jDx = 0; jDy = 0; jActive = false; jTouchId = null;
+    Object.keys(keys).forEach(k => keys[k] = false);
+  }
+
+  function resumeGame() {
+    if (!paused) return;
+    paused = false;
+    pauseOverlay.style.display = 'none';
+    lastTs = performance.now(); // reset timestamp so dt doesn't spike
+    raf = requestAnimationFrame(loop);
+  }
+
+  document.getElementById('pause-btn').addEventListener('click', pauseGame);
+  document.getElementById('resume-btn').addEventListener('click', resumeGame);
+  document.getElementById('pause-mainmenu-btn').addEventListener('click', () => {
+    paused = false;
+    pauseOverlay.style.display = 'none';
+    showLanding();
+  });
+
+  // Also pause on Escape key
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape') paused ? resumeGame() : pauseGame();
+  });
+
   // ── Loop ──────────────────────────────────────────────────────────────────
   function loop(ts) {
-    if (!running) return;
+    if (!running || paused) return;
     const dt = Math.min((ts - lastTs) / 1000, 0.05);
     lastTs = ts;
     update(dt);
@@ -1595,6 +1759,8 @@
   }
 
   window.__start = function () {
+    paused = false;
+    if (pauseOverlay) pauseOverlay.style.display = 'none';
     overlay.style.display = 'none';
     initGame();
     running = true;
