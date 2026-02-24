@@ -162,22 +162,25 @@
     potion: makeImg("assets/potion.png"),
 
     // ── Projectile ──
-    knife: makeGif("assets/player/boom1.gif"),
-    boom: makeGif("assets/player/boom.gif"),
+    knife: makeGif("assets/player/boom.gif"),
+    boom: makeGif("assets/player/boom1.gif"),
 
     // ── Enemies ──
     enemyBasic:       makeImg("assets/Enemy/Enemy1/enemy1_running.gif"),
     enemyBasicWalk:   makeImg("assets/Enemy/Enemy1/enemy1_running.gif"),
     enemyBasicIdle:   makeImg("assets/Enemy/Enemy1/enemy1_idle.gif"),
     enemyBasicAttack: makeImg("assets/Enemy/Enemy1/enemy1_attack.gif"),
+    enemyBasicDying:  makeGif("assets/Enemy/Enemy1/enemy1_dying.gif"),
     enemyFast:        makeImg("assets/Enemy/Enemy2/enemy2_running.gif"),
     enemyFastWalk:    makeImg("assets/Enemy/Enemy2/enemy2_running.gif"),
     enemyFastIdle:    makeImg("assets/Enemy/Enemy2/enemy2_idle.gif"),
     enemyFastAttack:  makeImg("assets/Enemy/Enemy2/enemy2_attack.gif"),
+    enemyFastDying:   makeGif("assets/Enemy/Enemy2/enemy2_dying.gif"),
     enemyTank:        makeImg("assets/Enemy/Enemy3/enemy3_running.gif"),
     enemyTankWalk:    makeImg("assets/Enemy/Enemy3/enemy3_running.gif"),
     enemyTankIdle:    makeImg("assets/Enemy/Enemy3/enemy3_idle.gif"),
     enemyTankAttack:  makeImg("assets/Enemy/Enemy3/enemy3_attack.gif"),
+    enemyTankDying:   makeGif("assets/Enemy/Enemy3/enemy3_dying.gif"),
 
     // ── Background — seasonal, loops every 4 stages ──
     bgWinter: makeImg("assets/bg/winter_cmp.png"),
@@ -899,6 +902,7 @@
       walkAsset: "enemyBasicWalk",
       idleAsset: "enemyBasicIdle",
       attackAsset: "enemyBasicAttack",
+      dyingAsset: "enemyBasicDying",  // already in ETYPES — will be copied to enemy obj
       emoji: "🐺",
       speedMult: 1.0,
       hpBonus: 0,
@@ -913,6 +917,7 @@
       walkAsset: "enemyFastWalk",
       idleAsset: "enemyFastIdle",
       attackAsset: "enemyFastAttack",
+      dyingAsset: "enemyFastDying",
       emoji: "🦊",
       speedMult: 1.9,
       hpBonus: 0,
@@ -927,6 +932,7 @@
       walkAsset: "enemyTankWalk",
       idleAsset: "enemyTankIdle",
       attackAsset: "enemyTankAttack",
+      dyingAsset: "enemyTankDying",
       emoji: "🐗",
       speedMult: 0.55,
       hpBonus: 3,
@@ -956,6 +962,7 @@
       walkAsset: t.walkAsset,
       idleAsset: t.idleAsset,
       attackAsset: t.attackAsset,
+      dyingAsset: t.dyingAsset,
       emoji: t.emoji,
       hp,
       maxHp: hp,
@@ -1009,7 +1016,7 @@
   function spawnBoom(x, y) {
     const el = document.createElement("img");
     el.src = "assets/player/boom.gif";
-    el.style.cssText = "position:absolute;pointer-events:none;transform:translate(-50%,-50%);width:64px;height:64px;";
+    el.style.cssText = "position:absolute;pointer-events:none;transform:translate(-50%,-50%);width:96px;height:96px;";
     el.style.left = ((x / W) * 100).toFixed(2) + "%";
     el.style.top  = ((y / H) * 100).toFixed(2) + "%";
     document.getElementById("sprite-layer").appendChild(el);
@@ -1209,6 +1216,7 @@
           const a = Math.atan2(target.y - player.y, target.x - player.x);
           player.angle = a;
           bullets.push({
+            id: "bullet-" + (++_spriteIdCounter),
             x: player.x,
             y: player.y,
             vx: Math.cos(a) * 420,
@@ -1242,6 +1250,7 @@
       b.life -= dt;
       if (b.spin !== undefined) b.spin += dt * 12; // ~2 full rotations per second
       if (b.life <= 0 || b.x > W + 20 || b.y < -20 || b.y > H + 20) {
+        if (b.id) _removeGifEl(b.id);
         bullets.splice(i, 1);
         continue;
       }
@@ -1255,19 +1264,16 @@
           e.hp -= dmgAmt;
           e.hitFlash = 0.25;
           spawnBoom(b.x, b.y);
+          if (b.id) _removeGifEl(b.id);
           bullets.splice(i, 1);
           if (b.isWordShot) {
             spawnDmgPop(e.x, e.y - e.r, "+" + dmgAmt + "💥");
           }
-          if (e.hp <= 0) {
-            burst(e.x, e.y, "#ff9900", 14);
-            _removeGifEl("enemy-" + e.id);
+          if (e.hp <= 0 && e.state !== "dying") {
             const pts = (e.points || 10) * world;
-            // 30% chance to drop a potion
             if (Math.random() < 0.05) {
-              potions.push({ x: e.x, y: e.y, r: 10, life: 12 }); // despawn after 12s
+              potions.push({ x: e.x, y: e.y, r: 10, life: 12 });
             }
-            enemies.splice(j, 1);
             score += pts;
             stageKills = Math.min(stageKills + 1, killsNeeded());
             kills++;
@@ -1276,6 +1282,11 @@
             if (b.isWordShot) {
               showFeedback("🎉 Enemy down! +" + pts + " pts", "hit");
             }
+            // Remove existing sprite so dying GIF starts fresh
+            _removeGifEl("enemy-" + e.id);
+            e.state = "dying";
+            e.dyingTimer = 0.8;
+            e.hp = 1;
           }
           break;
         }
@@ -1292,6 +1303,17 @@
 
       if (e.hitFlash > 0) e.hitFlash -= dt;
       if (e.attackTimer > 0) e.attackTimer -= dt;
+
+      // Dying state — play animation then remove
+      if (e.state === "dying") {
+        e.dyingTimer -= dt;
+        e.moving = false;
+        if (e.dyingTimer <= 0) {
+          _removeGifEl("enemy-" + e.id);
+          enemies.splice(i, 1);
+        }
+        continue; // skip all other logic while dying
+      }
 
       if (e.state === "walk") {
         if (distToPlayer > ATTACK_REACH) {
@@ -1556,15 +1578,14 @@
     }
     drawHPBar(player.x, player.y, 30, health, 100);
 
-    // Bullets — LINE 444: ASSETS.knife image or fallback emoji
-    const knifeSrc = ASSETS.knife;
+    // Bullets
     for (const b of bullets) {
-      ctx.save();
-      ctx.globalAlpha = Math.min(1, b.life);
-      ctx.translate(b.x, b.y);
-      ctx.rotate(b.angle + Math.PI / 4 + (b.spin || 0));
       if (b.isWordShot) {
-        // Word-powered projectile: glowing golden star burst
+        // Word-powered projectile: canvas draw
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, b.life);
+        ctx.translate(b.x, b.y);
+        ctx.rotate(b.angle + Math.PI / 4 + (b.spin || 0));
         const s = 14 + (b.wordDmg / 10);
         ctx.shadowColor = "#ffcc00";
         ctx.shadowBlur = 12;
@@ -1572,21 +1593,21 @@
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText("⭐", 0, 0);
-      } else if (knifeSrc && knifeSrc.complete && knifeSrc.naturalWidth > 0) {
-        // IMAGE PATH: draw knife image centered, rotated toward target, keeping aspect ratio
-        const kW = knifeSrc.naturalWidth;
-        const kH = knifeSrc.naturalHeight;
-        const kScale = 18 / Math.max(kW, kH);
-        const dW = kW * kScale;
-        const dH = kH * kScale;
-        ctx.drawImage(knifeSrc, -dW / 2, -dH / 2, dW, dH);
-      } else {
-        ctx.font = "18px serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(KNIFE_EMOJI, 0, 0);
+        ctx.restore();
+        if (b.id) _removeGifEl(b.id); // clean up any lingering DOM el
+      } else if (b.id) {
+        // GIF projectile via DOM overlay with CSS rotation
+        const el = _getGifEl(b.id, "assets/player/boom1.gif");
+        const angleDeg = ((b.angle + Math.PI / 4 + (b.spin || 0)) * 180 / Math.PI).toFixed(1);
+        el.style.display = "block";
+        el.style.left = ((b.x / W) * 100).toFixed(2) + "%";
+        el.style.top  = ((b.y / H) * 100).toFixed(2) + "%";
+        el.style.width  = "20px";
+        el.style.height = "20px";
+        el.style.opacity = Math.min(1, b.life);
+        el.style.transform = `translate(-50%,-50%) rotate(${angleDeg}deg)`;
+        _activeKeys.add(b.id);
       }
-      ctx.restore();
     }
 
     // Enemies
@@ -1596,19 +1617,35 @@
         ctx.globalAlpha = 0.5 + 0.5 * Math.sin(e.hitFlash * 40);
       }
       drawShadow(e.x, e.y, e.spriteR);
-      drawSprite(
-        e.asset,
-        e.emoji,
-        e.x,
-        e.y,
-        e.spriteR * 2.4,
-        1,
-        e.walkAsset,
-        e.state === "walk",
-        "enemy-" + e.id,
-        e.attackAsset,
-        e.state === "attack",
-      );
+      if (e.state === "dying") {
+        drawSprite(
+          e.dyingAsset,
+          e.emoji,
+          e.x,
+          e.y,
+          e.spriteR * 2.4,
+          Math.max(0.1, e.dyingTimer / 0.8),
+          null,
+          false,
+          "enemy-" + e.id,
+          null,
+          false,
+        );
+      } else {
+        drawSprite(
+          e.asset,
+          e.emoji,
+          e.x,
+          e.y,
+          e.spriteR * 2.4,
+          1,
+          e.walkAsset,
+          e.state === "walk",
+          "enemy-" + e.id,
+          e.attackAsset,
+          e.state === "attack",
+        );
+      }
       ctx.restore();
       drawHPBar(e.x, e.y, e.spriteR, e.hp, e.maxHp);
     }
